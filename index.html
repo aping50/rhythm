@@ -1,0 +1,3266 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>四小節節奏工作站</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f4f1ea;
+      color: #1e293b;
+      overscroll-behavior-y: contain;
+    }
+
+    /* Compact Custom Scrollbar */
+    ::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #e7e3d8;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #b8b09e;
+      border-radius: 999px;
+    }
+
+    /* Draggable & Tappable Rhythm Tiles */
+    .rhythm-tile {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.12s ease, box-shadow 0.14s ease, border-color 0.14s ease, background-color 0.14s ease;
+    }
+    .rhythm-tile:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    }
+    .rhythm-tile:active {
+      transform: scale(0.96);
+    }
+    .rhythm-tile.tile-flash {
+      animation: tilePulse 0.28s ease-out;
+    }
+    @keyframes tilePulse {
+      0% { background-color: #a7f3d0; border-color: #059669; transform: scale(0.95); }
+      100% { transform: scale(1); }
+    }
+
+    /* Floating Drag Ghost */
+    #drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -55%) scale(1.06);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24);
+      opacity: 0.96;
+    }
+
+    /* Active Note Highlight during Web Audio Playback */
+    .note-group.active-note .notehead,
+    .note-group.active-note .note-stem,
+    .note-group.active-note .note-dot,
+    .note-group.active-note .note-flag,
+    .note-group.active-note .note-rest {
+      fill: #dc2626 !important;
+      stroke: #dc2626 !important;
+    }
+
+    /* Interactive Notehead Tie Hover & Active Indicator */
+    .tieable-notehead {
+      cursor: pointer;
+    }
+    .tieable-notehead .notehead-ring {
+      opacity: 0;
+      transition: opacity 0.14s ease;
+    }
+    .tieable-notehead:hover .notehead-ring {
+      opacity: 1;
+    }
+    .tieable-notehead.is-tied .notehead-ring {
+      opacity: 0.92;
+      stroke: #d97706;
+      stroke-dasharray: none;
+      fill: rgba(251, 191, 36, 0.24);
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <!-- 1. CLEAN TOP HEADER BAR -->
+  <header class="sticky top-0 z-40 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white shadow-md border-b border-indigo-900/60">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+      <!-- Left: Title & Subtitle -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-lg shadow-inner shrink-0">
+          🎼
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <h1 class="text-base sm:text-lg font-extrabold tracking-wide">四小節節奏工作站</h1>
+            <span class="text-xs font-semibold text-indigo-200/90 hidden sm:inline">音樂班・檢定聽寫節奏訓練系統</span>
+          </div>
+          <p class="text-[11px] text-slate-300 hidden md:block">
+            勾選上方音型積木並按「產出新題」→ 聆聽完整四小節播放 → 從下方積木列填入第 3–4 小節並點擊符頭建立連結線 → 送出自動批改
+          </p>
+        </div>
+      </div>
+
+      <!-- Right: Collapse Toggle & Prominent Generate New Question Button -->
+      <div class="flex items-center gap-2">
+        <button id="btn-toggle-top-panel" onclick="toggleTopPanel()" class="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 active:scale-95 text-white border border-white/25 text-xs sm:text-sm font-extrabold px-3.5 py-2 rounded-xl transition">
+          <span>收合出題設定 ▲</span>
+        </button>
+        <button onclick="generateNewPrompt()" class="inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-xs sm:text-sm font-black px-4 py-2 rounded-xl shadow transition">
+          <span>🎲 產出新題</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="max-w-7xl mx-auto px-3 sm:px-5 pt-3.5 space-y-3">
+
+    <!-- 2. TOP COLLAPSIBLE PANEL: 出題設定與雙向節奏積木庫 -->
+    <section id="panel-settings-and-palette" class="bg-white rounded-2xl border border-stone-200/90 p-3 sm:p-4 shadow-sm transition-all">
+      <!-- Collapsed Summary Bar -->
+      <div id="top-panel-collapsed-bar" class="hidden flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+          <span class="text-xs sm:text-sm font-extrabold text-slate-800">出題設定已收合</span>
+          <span id="collapsed-summary-text" class="text-xs font-bold text-slate-700 bg-stone-100 border border-stone-200 px-3 py-1 rounded-lg">
+            拍號：4/4 ｜ 速度：72 BPM ｜ 連結線：少（1-2） ｜ 32分音符：關閉 ｜ 已啟用積木：17 個
+          </span>
+        </div>
+        <button onclick="toggleTopPanel()" class="text-xs font-extrabold text-indigo-700 hover:text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 transition">
+          展開出題設定 ▼
+        </button>
+      </div>
+
+      <!-- Expanded Body -->
+      <div id="top-panel-expanded-body" class="space-y-3">
+        <!-- Row 1: 9 Time Signatures + Tie Mode + Easter Egg -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+          <!-- LEFT (7 cols): 9 Time Signatures & Quick Presets -->
+          <div class="lg:col-span-7 flex flex-col justify-between gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <!-- Simple: Half-note = 1 beat -->
+              <div class="bg-stone-50/90 border border-stone-200/80 rounded-xl p-2 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-extrabold text-slate-700">單拍子 · 二分1拍</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">半拍填入</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition" data-meter="2/2" onclick="selectPendingMeter('2/2')">2/2</button>
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition" data-meter="3/2" onclick="selectPendingMeter('3/2')">3/2</button>
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition" data-meter="4/2" onclick="selectPendingMeter('4/2')">4/2</button>
+                </div>
+              </div>
+
+              <!-- Simple: Quarter-note = 1 beat -->
+              <div class="bg-stone-50/90 border border-stone-200/80 rounded-xl p-2 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-extrabold text-slate-700">單拍子 · 四分1拍</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-stone-200/70 text-slate-600">標準單拍</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition" data-meter="2/4" onclick="selectPendingMeter('2/4')">2/4</button>
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition" data-meter="3/4" onclick="selectPendingMeter('3/4')">3/4</button>
+                  <button class="meter-btn py-1.5 rounded-lg text-sm font-extrabold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition" data-meter="4/4" onclick="selectPendingMeter('4/4')">4/4</button>
+                </div>
+              </div>
+
+              <!-- Compound: Dotted-quarter = 1 beat -->
+              <div class="bg-stone-50/90 border border-stone-200/80 rounded-xl p-2 flex flex-col justify-between">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-extrabold text-slate-700">複拍子 · 附點四分1拍</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 border border-teal-200">三等分律動</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <button class="meter-btn compound py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-teal-600 transition" data-meter="6/8" onclick="selectPendingMeter('6/8')">6/8</button>
+                  <button class="meter-btn compound py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-teal-600 transition" data-meter="9/8" onclick="selectPendingMeter('9/8')">9/8</button>
+                  <button class="meter-btn compound py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-teal-600 transition" data-meter="12/8" onclick="selectPendingMeter('12/8')">12/8</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pool Presets & Pending Change Notice -->
+            <div class="flex flex-wrap items-center justify-between gap-2 bg-stone-50 border border-stone-200/80 rounded-xl px-2.5 py-1.5">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-xs font-extrabold text-slate-700">題庫快捷：</span>
+                <button onclick="bulkSetBlocks('all')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-stone-200 transition">全選</button>
+                <button onclick="bulkSetBlocks('default')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-stone-200 transition">常用完整</button>
+                <button onclick="bulkSetBlocks('basic1beat')" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-stone-200 transition">僅選基礎節奏</button>
+              </div>
+              <span id="pending-settings-notice" class="hidden text-[11px] font-extrabold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-md">
+                ⚠️ 設定已變更，按「🎲 產出新題」套用至考題
+              </span>
+            </div>
+          </div>
+
+          <!-- RIGHT (5 cols): Tie Mode & Easter Egg -->
+          <div class="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <!-- Tie Mode (Strictly 3 options) -->
+            <div class="bg-stone-50/90 border border-stone-200/80 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-xs font-extrabold text-slate-800">🔗 連結線設定</span>
+                <span id="tie-mode-val" class="text-[11px] font-extrabold text-indigo-700 bg-white border border-stone-200 px-1.5 py-0.5 rounded">少（1-2）</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5 my-0.5">
+                <button id="tie-mode-btn-none" onclick="setTieMode('none')" class="py-1.5 rounded-lg text-xs font-extrabold border border-stone-200 bg-white text-slate-700 hover:border-indigo-500 transition">無</button>
+                <button id="tie-mode-btn-low" onclick="setTieMode('low')" class="py-1.5 rounded-lg text-xs font-extrabold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition">少（1-2）</button>
+                <button id="tie-mode-btn-medium" onclick="setTieMode('medium')" class="py-1.5 rounded-lg text-xs font-extrabold border border-stone-200 bg-white text-slate-700 hover:border-indigo-500 transition">中（3-4）</button>
+              </div>
+              <div class="text-[10.5px] text-slate-500 font-medium leading-tight">
+                全曲四小節內隨機產生的連結線總數
+              </div>
+            </div>
+
+            <!-- Easter Egg (32nd note for /4 & /8, 16th note for /2) -->
+            <div class="bg-amber-50/75 border border-amber-200/90 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+              <div class="flex items-center justify-between gap-1">
+                <span id="egg-title-label" class="text-xs font-extrabold text-slate-800">⚡ 考題彩蛋：32分音符</span>
+                <span id="egg-badge" class="text-[10.5px] font-extrabold px-1.5 py-0.5 rounded bg-stone-200 text-slate-600">關閉</span>
+              </div>
+              <select id="egg-mode-select" onchange="updateEggSetting(this.value)" class="w-full text-xs font-bold text-slate-800 bg-white border border-amber-300 rounded-lg px-2 py-1.5 cursor-pointer">
+                <option value="off" selected>關閉</option>
+                <option value="0.25">偶爾 25%</option>
+                <option value="0.55">經常 55%</option>
+                <option value="1.0">必考 100%</option>
+              </select>
+              <div id="egg-hint-label" class="text-[10.5px] text-amber-900/80 font-medium leading-tight">
+                開啟後方可勾選彩蛋積木並同步顯示於作答區
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Bidirectional Rhythm Block Library (9 columns, NO Chinese note names) -->
+        <div class="pt-2.5 border-t border-stone-100 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
+              <h2 class="text-xs sm:text-sm font-extrabold text-slate-800">出題音型積木勾選庫</h2>
+              <span class="text-[11px] text-slate-500">
+                （勾選「出題」即時同步至下方作答專用積木列）
+              </span>
+            </div>
+
+            <!-- 3 Meter Family Tabs -->
+            <div class="inline-flex flex-wrap bg-stone-100 p-0.5 rounded-xl border border-stone-200 gap-0.5">
+              <button id="tab-simple_half" onclick="switchSelectorTab('simple_half')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold transition text-slate-600 hover:text-slate-900">
+                單拍子 · 二分1拍 (2/2–4/2)
+              </button>
+              <button id="tab-simple_quarter" onclick="switchSelectorTab('simple_quarter')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold transition bg-indigo-600 text-white shadow-2xs">
+                單拍子 · 四分1拍 (2/4–4/4)
+              </button>
+              <button id="tab-compound" onclick="switchSelectorTab('compound')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold transition text-slate-600 hover:text-slate-900">
+                複拍子 · 附點四分1拍 (6/8–12/8)
+              </button>
+            </div>
+          </div>
+
+          <!-- 9-Column Block Grid -->
+          <div id="block-selector-body" class="space-y-2.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. MIDDLE AUDIO PLAYBACK & SYNTHESIS CONTROL BAR -->
+    <section class="bg-white rounded-2xl border border-stone-200/90 p-3 sm:p-3.5 shadow-sm space-y-2.5">
+      <!-- Top Row: Playback Controls & Play Counter -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button onclick="startPlayback('exam_all')" class="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs sm:text-sm font-extrabold px-4 py-2 rounded-xl shadow-2xs transition">
+            <span>▶️ 播放全曲（4小節）</span>
+          </button>
+
+          <button onclick="startPlayback('exam_34')" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl shadow-2xs transition">
+            <span>🔁 只聽第 3–4 小節</span>
+          </button>
+
+          <button onclick="startPlayback('student_only')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl shadow-2xs transition">
+            <span>🎧 試聽我的作答（3–4小節）</span>
+          </button>
+
+          <button id="btn-stop" onclick="stopPlayback()" disabled class="inline-flex items-center gap-1 bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl transition">
+            <span>⏹️ 停止</span>
+          </button>
+        </div>
+
+        <!-- Active Meter & Play Count -->
+        <div class="flex items-center gap-2">
+          <span id="active-meter-pill" class="text-xs font-extrabold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 border border-slate-200">
+            當前考題拍號：4/4
+          </span>
+          <div class="inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-xl">
+            <span class="text-xs font-extrabold text-indigo-950">播放次數：<span id="play-count-val" class="text-sm font-black text-indigo-700">0</span> 次</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row: BPM (50-140, default 72, +/- buttons) + 3 Timbres + Metronome Toggle (Default OFF, no count-in) -->
+      <div class="pt-2 border-t border-stone-100 flex flex-wrap items-center justify-between gap-2.5">
+        <!-- Tempo Controls -->
+        <div class="flex flex-wrap items-center gap-2 bg-stone-50 border border-stone-200 px-3 py-1.5 rounded-xl">
+          <span class="text-xs font-extrabold text-slate-700">速度 BPM：</span>
+          <button onclick="stepBpm(-2)" class="w-7 h-7 rounded-lg bg-white hover:bg-indigo-50 border border-stone-300 text-slate-800 font-black text-sm flex items-center justify-center transition" title="減慢速度">−</button>
+          <input type="range" id="bpm-slider" min="50" max="140" step="1" value="72" oninput="updateBpm(this.value)" class="w-24 sm:w-32 accent-indigo-600 cursor-pointer" />
+          <button onclick="stepBpm(2)" class="w-7 h-7 rounded-lg bg-white hover:bg-indigo-50 border border-stone-300 text-slate-800 font-black text-sm flex items-center justify-center transition" title="加快速度">+</button>
+          <span id="bpm-val" class="text-sm font-black text-slate-900 min-w-[28px] text-right">72</span>
+          <span id="bpm-pulse-unit" class="text-[11px] font-bold text-slate-500">拍/分（無預備拍）</span>
+        </div>
+
+        <!-- 3 Timbres + Metronome On/Off + Volume -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1">
+            <span class="text-xs font-extrabold text-slate-600 mr-0.5">音色：</span>
+            <button id="timbre-btn-woodblock" onclick="selectTimbre('woodblock')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition">
+              🪵 木魚
+            </button>
+            <button id="timbre-btn-piano" onclick="selectTimbre('piano')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold border border-stone-300 bg-white text-slate-700 hover:border-indigo-500 transition">
+              🎹 鋼琴
+            </button>
+            <button id="timbre-btn-snare" onclick="selectTimbre('snare')" class="px-2.5 py-1 rounded-lg text-xs font-extrabold border border-stone-300 bg-white text-slate-700 hover:border-indigo-500 transition">
+              🥁 小鼓
+            </button>
+          </div>
+
+          <button id="btn-metronome" onclick="toggleMetronome()" class="px-3 py-1 rounded-lg text-xs font-extrabold border border-stone-300 bg-white text-slate-600 hover:border-indigo-400 transition">
+            ⏱️ 節拍器：關
+          </button>
+
+          <div class="flex items-center gap-1.5 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg">
+            <span class="text-[11px] font-bold text-slate-600">音量</span>
+            <input type="range" min="0" max="1" step="0.05" value="0.9" oninput="audioState.volRhythm = parseFloat(this.value)" class="w-16 accent-emerald-600 cursor-pointer" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. BOTTOM 4-BAR SCORE WORKBENCH, DEDICATED ANSWER PALETTE & GRADING -->
+    <section class="bg-[#fdfbf7] rounded-2xl border-2 border-stone-300/90 p-3.5 sm:p-5 shadow-md space-y-4">
+      <!-- Measures 1 & 2: Prompt Section -->
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+              題幹區 · 第 1–2 小節（已顯示）
+            </span>
+            <span id="prompt-feature-badge" class="text-xs font-semibold text-amber-800 bg-amber-100/80 border border-amber-200 px-2.5 py-0.5 rounded-full">
+              題幹元素：附點 · 三連音
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="meter-instruction-hint" class="text-xs font-semibold text-slate-500">請聆聽全曲四小節，並聽寫填入第 3–4 小節</span>
+            <div class="inline-flex bg-stone-200/70 p-0.5 rounded-lg text-[11px]">
+              <button id="staff-single-btn" onclick="setStaffStyle('single')" class="px-2 py-0.5 rounded font-bold bg-white text-slate-800 shadow-2xs">單線譜</button>
+              <button id="staff-five-btn" onclick="setStaffStyle('five')" class="px-2 py-0.5 rounded font-semibold text-slate-500 hover:text-slate-800">五線譜</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="bg-white rounded-xl border border-stone-200 p-2 shadow-2xs" id="measure-slot-0"></div>
+          <div class="bg-white rounded-xl border border-stone-200 p-2 shadow-2xs" id="measure-slot-1"></div>
+        </div>
+      </div>
+
+      <!-- Measures 3 & 4: Student Dictation Zone -->
+      <div>
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="student-zone-badge" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+              聽寫作答區 · 第 3–4 小節（拖曳或點擊下方積木填入）
+            </span>
+            <span id="student-progress-badge" class="text-xs font-extrabold text-emerald-700">
+              已填 0 / 8 拍（第3小節剩 4 拍 · 第4小節剩 4 拍）
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button id="btn-undo-student" onclick="undoStudentBlock()" disabled class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white hover:bg-stone-100 disabled:opacity-40 text-slate-700 border border-stone-300 transition">
+              ↩ 復原一格
+            </button>
+            <button id="btn-clear-student" onclick="clearStudentMeasures()" disabled class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 transition">
+              🗑️ 清空作答
+            </button>
+            <button id="btn-submit-exam" onclick="submitAndGradeAnswer()" class="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-45 disabled:pointer-events-none active:scale-95 text-slate-950 text-xs sm:text-sm font-black px-4 py-1.5 rounded-xl shadow transition">
+              <span>✅ 送出並公布答案</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="relative bg-white rounded-xl border-2 border-dashed border-emerald-300/90 p-2 transition-colors" id="measure-slot-2"></div>
+          <div class="relative bg-white rounded-xl border-2 border-dashed border-emerald-300/90 p-2 transition-colors" id="measure-slot-3"></div>
+        </div>
+
+        <!-- Interactive Notehead Tie Status Bar -->
+        <div id="student-tie-bar" class="mt-2 bg-amber-50/75 border border-amber-200/80 rounded-xl px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
+          <span id="student-tie-hint-text" class="text-xs font-bold text-slate-700">
+            🔗 連結線操作：點擊作答區（或第 2 小節末音）的<span class="text-amber-700 underline decoration-amber-400">音符符頭</span>即可建立／取消連向下一音的弧線（支持跨拍與跨小節）
+          </span>
+          <span id="student-tie-count-badge" class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-white text-slate-500 border border-stone-200">
+            目前作答區已設 0 條連結線
+          </span>
+        </div>
+
+        <!-- DEDICATED BOTTOM ANSWER PALETTE (9 columns, color-synced, zero Chinese note text) -->
+        <div id="panel-answer-palette" class="mt-3 bg-emerald-50/60 border border-emerald-200/90 rounded-2xl p-2.5 sm:p-3 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-1.5">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
+              <h3 class="text-xs sm:text-sm font-extrabold text-emerald-950">作答專用積木列</h3>
+              <span id="answer-palette-subtitle" class="text-[11px] font-semibold text-emerald-800">
+                僅顯示上方已勾選啟用之 4/4 拍音型 · 拖曳至第 3–4 小節或點擊自動填入
+              </span>
+            </div>
+            <span id="answer-palette-count-badge" class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
+              可用積木：17 個
+            </span>
+          </div>
+
+          <div id="answer-palette-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5"></div>
+        </div>
+      </div>
+
+      <!-- GRADING RESULT & OFFICIAL ANSWER REVEAL (Hidden until "送出並公布答案") -->
+      <div id="grading-result-panel" class="hidden pt-4 border-t-2 border-amber-300/80 space-y-3">
+        <!-- Score Banner -->
+        <div id="grading-score-banner" class="rounded-2xl border p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3"></div>
+
+        <!-- Official Answer Key (Bars 3 & 4) -->
+        <div class="bg-amber-50/85 border border-amber-300 rounded-2xl p-3.5 sm:p-4 space-y-2.5 shadow-inner">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-black text-amber-950">📋 標準解答（第 3–4 小節）</span>
+              <span id="answer-cross-tie-note" class="hidden text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-950">
+                🔗 含第 2 小節末音連向第 3 小節首音之跨小節連結線
+              </span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="startPlayback('exam_all')" class="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow-2xs transition">
+                <span>🔊 播放標準解答</span>
+              </button>
+              <button onclick="startPlayback('student_all')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow-2xs transition">
+                <span>🎧 播放我的作答</span>
+              </button>
+              <button onclick="generateNewPrompt()" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-extrabold px-3.5 py-1.5 rounded-xl shadow transition">
+                <span>🎲 產出新題</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="bg-white rounded-xl border border-amber-300 p-2 shadow-2xs" id="ans-measure-slot-2"></div>
+            <div class="bg-white rounded-xl border border-amber-300 p-2 shadow-2xs" id="ans-measure-slot-3"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Floating Drag Ghost Element -->
+  <div id="drag-ghost" class="hidden w-[84px] bg-white border-2 border-emerald-500 rounded-xl p-1.5 flex flex-col items-center"></div>
+
+  <!-- Non-blocking Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    /* ==========================================================================
+       1. TIME SIGNATURES & COMPLETE RHYTHM BLOCK LIBRARIES (NO CHINESE LABELS)
+       ========================================================================== */
+
+    const METERS = {
+      '2/2':  { num: 2, den: 2, family: 'simple_half',    beats: 2, slotUnit: 0.5 },
+      '3/2':  { num: 3, den: 2, family: 'simple_half',    beats: 3, slotUnit: 0.5 },
+      '4/2':  { num: 4, den: 2, family: 'simple_half',    beats: 4, slotUnit: 0.5 },
+      '2/4':  { num: 2, den: 4, family: 'simple_quarter', beats: 2, slotUnit: 1.0 },
+      '3/4':  { num: 3, den: 4, family: 'simple_quarter', beats: 3, slotUnit: 1.0 },
+      '4/4':  { num: 4, den: 4, family: 'simple_quarter', beats: 4, slotUnit: 1.0 },
+      '6/8':  { num: 6, den: 8, family: 'compound',       beats: 2, slotUnit: 1.0 },
+      '9/8':  { num: 9, den: 8, family: 'compound',       beats: 3, slotUnit: 1.0 },
+      '12/8': { num: 12, den: 8, family: 'compound',      beats: 4, slotUnit: 1.0 }
+    };
+
+    // Helper to define notes cleanly (supports sounding notes and rests)
+    function makeNotes(specList, tuplet = null, isEgg = false) {
+      return specList.map(item => {
+        if (typeof item === 'number') {
+          return { dur: item, isRest: false, tuplet, isEgg };
+        }
+        return { dur: item.dur, isRest: !!item.isRest, tuplet, isEgg };
+      });
+    }
+
+    const RHYTHM_BLOCKS = [
+      // ==================== A. SIMPLE METERS: QUARTER = 1 BEAT (2/4, 3/4, 4/4) ====================
+      // 17 non-duplicate core blocks (13 one-beat white + 4 two-beat soft blue)
+      {
+        id: 'sq_q', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([1])
+      },
+      {
+        id: 'sq_2e', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([0.5, 0.5])
+      },
+      {
+        id: 'sq_4s', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([0.25, 0.25, 0.25, 0.25])
+      },
+      {
+        id: 'sq_e_2s', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.5, 0.25, 0.25])
+      },
+      {
+        id: 'sq_2s_e', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.25, 0.25, 0.5])
+      },
+      {
+        id: 'sq_sync16', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.25, 0.5, 0.25])
+      },
+      {
+        id: 'sq_dote_s', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.75, 0.25])
+      },
+      {
+        id: 'sq_s_dote', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.25, 0.75])
+      },
+      {
+        id: 'sq_trip3', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([1/3, 1/3, 1/3], 3)
+      },
+      {
+        id: 'sq_trip_q_e', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([2/3, 1/3], 3)
+      },
+      {
+        id: 'sq_trip_e_q', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([1/3, 2/3], 3)
+      },
+      {
+        id: 'sq_qrest', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([{ dur: 1, isRest: true }])
+      },
+      {
+        id: 'sq_erest_e', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([{ dur: 0.5, isRest: true }, 0.5])
+      },
+      // 4 two-beat soft-blue blocks
+      {
+        id: 'sq_half', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([2])
+      },
+      {
+        id: 'sq_dotq_e', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([1.5, 0.5])
+      },
+      {
+        id: 'sq_e_dotq', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([0.5, 1.5])
+      },
+      {
+        id: 'sq_sync2', family: 'simple_quarter', category: '常規音型（17種）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([0.5, 1.0, 0.5])
+      },
+
+      // 5 32nd-note Easter egg blocks for 2/4, 3/4, 4/4 (1 beat each, white)
+      {
+        id: 'sq32_8x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125], null, true)
+      },
+      {
+        id: 'sq32_e_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.5, 0.125, 0.125, 0.125, 0.125], null, true)
+      },
+      {
+        id: 'sq32_4x32_e', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.5], null, true)
+      },
+      {
+        id: 'sq32_2x16_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.25, 0.25, 0.125, 0.125, 0.125, 0.125], null, true)
+      },
+      {
+        id: 'sq32_4x32_2x16', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.25, 0.25], null, true)
+      },
+
+      // ==================== B. SIMPLE METERS: HALF-NOTE = 1 BEAT (2/2, 3/2, 4/2) ====================
+      // Half-beat (0.5拍) blocks -> super-light green (#ecfdf3)
+      {
+        id: 'sh_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([0.5])
+      },
+      {
+        id: 'sh_2e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([0.25, 0.25])
+      },
+      {
+        id: 'sh_qrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([{ dur: 0.5, isRest: true }])
+      },
+      {
+        id: 'sh_trip3', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([1/6, 1/6, 1/6], 3)
+      },
+      {
+        id: 'sh_trip_q_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([1/3, 1/6], 3)
+      },
+      {
+        id: 'sh_trip_e_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([1/6, 1/3], 3)
+      },
+
+      // 1-beat (1拍) blocks -> white
+      {
+        id: 'sh_half', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([1])
+      },
+      {
+        id: 'sh_dotq_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.75, 0.25])
+      },
+      {
+        id: 'sh_e_dotq', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.25, 0.75])
+      },
+      {
+        id: 'sh_sync1', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
+        notes: makeNotes([0.25, 0.5, 0.25])
+      },
+      {
+        id: 'sh_hrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([{ dur: 1, isRest: true }])
+      },
+
+      // 2-beat (2拍) blocks -> soft blue
+      {
+        id: 'sh_whole', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([2])
+      },
+      {
+        id: 'sh_doth_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([1.5, 0.5])
+      },
+      {
+        id: 'sh_q_doth', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([0.5, 1.5])
+      },
+      {
+        id: 'sh_sync2', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
+        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
+        notes: makeNotes([0.5, 1.0, 0.5])
+      },
+
+      // 6 16th-note Easter egg blocks for 2/2, 3/2, 4/2 (ONLY 0.5拍 half-beat, super-light green, NO 32nds, NO sextuplets)
+      {
+        id: 'sh16_4s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.125, 0.125, 0.125], null, true)
+      },
+      {
+        id: 'sh16_e_2s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.25, 0.125, 0.125], null, true)
+      },
+      {
+        id: 'sh16_2s_e', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.125, 0.25], null, true)
+      },
+      {
+        id: 'sh16_sync', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.25, 0.125], null, true)
+      },
+      {
+        id: 'sh16_dote_s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.375, 0.125], null, true)
+      },
+      {
+        id: 'sh16_s_dote', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
+        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.125, 0.375], null, true)
+      },
+
+      // ==================== C. COMPOUND METERS: DOTTED-QUARTER = 1 BIG BEAT (6/8, 9/8, 12/8) ====================
+      // 1. Basic 1-beat blocks (white)
+      {
+        id: 'c_dotq', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([1])
+      },
+      {
+        id: 'c_3e', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([1/3, 1/3, 1/3])
+      },
+      {
+        id: 'c_q_e', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([2/3, 1/3])
+      },
+      {
+        id: 'c_e_q', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([1/3, 2/3])
+      },
+      {
+        id: 'c_dotqrest', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
+        notes: makeNotes([{ dur: 1, isRest: true }])
+      },
+
+      // 2. 附點+16+8 group (unified teal)
+      {
+        id: 'c_dote_s_e', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
+        notes: makeNotes([0.5, 1/6, 1/3])
+      },
+      {
+        id: 'c_e_dote_s', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
+        notes: makeNotes([1/3, 0.5, 1/6])
+      },
+      {
+        id: 'c_e_s_dote', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
+        notes: makeNotes([1/3, 1/6, 0.5])
+      },
+
+      // 3. 雙十六+兩八 group (unified purple)
+      {
+        id: 'c_2s_2e', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
+        notes: makeNotes([1/6, 1/6, 1/3, 1/3])
+      },
+      {
+        id: 'c_e_2s_e', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
+        notes: makeNotes([1/3, 1/6, 1/6, 1/3])
+      },
+      {
+        id: 'c_2e_2s', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
+        notes: makeNotes([1/3, 1/3, 1/6, 1/6])
+      },
+
+      // 4. 附點八+三16 group (unified rose)
+      {
+        id: 'c_dote_3s_p1', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
+        notes: makeNotes([0.5, 1/6, 1/6, 1/6])
+      },
+      {
+        id: 'c_dote_3s_p2', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
+        notes: makeNotes([1/6, 0.5, 1/6, 1/6])
+      },
+      {
+        id: 'c_dote_3s_p3', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
+        notes: makeNotes([1/6, 1/6, 0.5, 1/6])
+      },
+      {
+        id: 'c_dote_3s_p4', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
+        notes: makeNotes([1/6, 1/6, 1/6, 0.5])
+      },
+
+      // 5. 五個音一組: 8 + four 16ths in all 5 positions (unified indigo)
+      {
+        id: 'c_5n_p1', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
+        notes: makeNotes([1/3, 1/6, 1/6, 1/6, 1/6])
+      },
+      {
+        id: 'c_5n_p2', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
+        notes: makeNotes([1/6, 1/3, 1/6, 1/6, 1/6])
+      },
+      {
+        id: 'c_5n_p3', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
+        notes: makeNotes([1/6, 1/6, 1/3, 1/6, 1/6])
+      },
+      {
+        id: 'c_5n_p4', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
+        notes: makeNotes([1/6, 1/6, 1/6, 1/3, 1/6])
+      },
+      {
+        id: 'c_5n_p5', family: 'compound', category: '常規一大拍音型（20種）',
+        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
+        notes: makeNotes([1/6, 1/6, 1/6, 1/6, 1/3])
+      },
+
+      // Compound 32nd-note Easter egg blocks (3 blocks, 1 big beat each, white)
+      {
+        id: 'c32_dote_2x32_e', family: 'compound', category: '32分音符彩蛋積木（3種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([0.5, 1/12, 1/12, 1/3], null, true)
+      },
+      {
+        id: 'c32_e_ddote_32', family: 'compound', category: '32分音符彩蛋積木（3種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([1/3, 7/12, 1/12], null, true)
+      },
+      {
+        id: 'c32_2e_s_2x32', family: 'compound', category: '32分音符彩蛋積木（3種）',
+        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
+        notes: makeNotes([1/3, 1/3, 1/6, 1/12, 1/12], null, true)
+      }
+    ];
+
+    /* ==========================================================================
+       2. APPLICATION STATE & DRAG-AND-DROP STATE
+       ========================================================================== */
+
+    const state = {
+      topPanelCollapsed: false,
+      activeMeterKey: '4/4',
+      pendingMeterKey: '4/4',
+      hasPendingChanges: false,
+      staffStyle: 'single',            // 'single' | 'five'
+      selectorTab: 'simple_quarter',   // 'simple_half' | 'simple_quarter' | 'compound'
+      tieMode: 'low',                  // 'none' | 'low' (1-2) | 'medium' (3-4)
+      eggMode: 'off',                  // 'off' | '0.25' | '0.55' | '1.0'
+      activeEggMode: 'off',            // synced for bottom palette & generation
+      playCount: 0,
+      isSubmitted: false,
+      enabledBlockIds: new Set(RHYTHM_BLOCKS.filter(b => b.defaultOn).map(b => b.id)),
+      solutionMeasures: [
+        { blocks: [] },
+        { blocks: [] },
+        { blocks: [] },
+        { blocks: [] }
+      ],
+      measures: [
+        { blocks: [] },
+        { blocks: [] },
+        { blocks: [] },
+        { blocks: [] }
+      ],
+      studentHistory: [],
+      gradeMarks: {}
+    };
+
+    const dragState = {
+      active: false,
+      isDragging: false,
+      sourceType: null,      // 'palette' | 'placed'
+      blockId: null,
+      fromMeasureIdx: -1,
+      fromBlockIdx: -1,
+      startX: 0,
+      startY: 0,
+      hoverTarget: null
+    };
+
+    const audioState = {
+      ctx: null,
+      noiseBuffer: null,
+      isPlaying: false,
+      playMode: 'exam_all',
+      bpm: 72,
+      metronomeOn: false,    // Default OFF, zero count-in
+      volRhythm: 0.9,
+      timbre: 'woodblock',   // 'woodblock' | 'piano' | 'snare'
+      timerId: null,
+      rafId: null,
+      scheduleEvents: [],
+      nextEventIdx: 0,
+      startTime: 0,
+      totalBeats: 0
+    };
+
+    /* ==========================================================================
+       3. NOTATION MATH & BEAT DURATION HELPERS
+       ========================================================================== */
+
+    function getActiveMeter() {
+      return METERS[state.activeMeterKey];
+    }
+
+    function getPendingMeter() {
+      return METERS[state.pendingMeterKey];
+    }
+
+    function isHalfBeatMeter(meterObj = getActiveMeter()) {
+      return meterObj.family === 'simple_half';
+    }
+
+    function getSecondsPerBeat() {
+      return 60.0 / audioState.bpm;
+    }
+
+    function getWrittenQuarters(beatDur, tuplet, meterObj) {
+      let scale = 1.0;
+      if (meterObj.den === 2) scale = 2.0;
+      else if (meterObj.den === 8) scale = 1.5;
+
+      let tupletRatio = 1.0;
+      if (tuplet === 3) tupletRatio = 3 / 2;
+      else if (tuplet === 2) tupletRatio = 2 / 3;
+      else if (tuplet === 4) tupletRatio = 4 / 6;
+      else if (tuplet === 6) tupletRatio = 6 / 4;
+
+      return beatDur * scale * tupletRatio;
+    }
+
+    function writtenQuartersToVisual(wq) {
+      const eps = 0.005;
+      if (Math.abs(wq - 6.0) < eps)   return { head: 'whole',   stem: false, dots: 1, beams: 0 };
+      if (Math.abs(wq - 4.0) < eps)   return { head: 'whole',   stem: false, dots: 0, beams: 0 };
+      if (Math.abs(wq - 3.0) < eps)   return { head: 'half',    stem: true,  dots: 1, beams: 0 };
+      if (Math.abs(wq - 2.0) < eps)   return { head: 'half',    stem: true,  dots: 0, beams: 0 };
+      if (Math.abs(wq - 1.75) < eps)  return { head: 'quarter', stem: true,  dots: 2, beams: 0 };
+      if (Math.abs(wq - 1.5) < eps)   return { head: 'quarter', stem: true,  dots: 1, beams: 0 };
+      if (Math.abs(wq - 1.0) < eps)   return { head: 'quarter', stem: true,  dots: 0, beams: 0 };
+      if (Math.abs(wq - 0.875) < eps) return { head: 'solid',   stem: true,  dots: 2, beams: 1 };
+      if (Math.abs(wq - 0.75) < eps)  return { head: 'solid',   stem: true,  dots: 1, beams: 1 };
+      if (Math.abs(wq - 0.5) < eps)   return { head: 'solid',   stem: true,  dots: 0, beams: 1 };
+      if (Math.abs(wq - 0.375) < eps) return { head: 'solid',   stem: true,  dots: 1, beams: 2 };
+      if (Math.abs(wq - 0.25) < eps)  return { head: 'solid',   stem: true,  dots: 0, beams: 2 };
+      if (Math.abs(wq - 0.125) < eps) return { head: 'solid',   stem: true,  dots: 0, beams: 3 };
+      return { head: 'solid', stem: true, dots: 0, beams: 0 };
+    }
+
+    function getMeasureUsedBeats(measureIdx, measuresArr = state.measures) {
+      return measuresArr[measureIdx].blocks.reduce((sum, blk) => sum + blk.beats, 0);
+    }
+
+    function instantiateBlock(blockDef) {
+      return {
+        blockId: blockDef.id,
+        beats: blockDef.beats,
+        tuplet: blockDef.tuplet,
+        isEgg: !!blockDef.isEgg,
+        notes: blockDef.notes.map(n => ({
+          dur: n.dur,
+          isRest: !!n.isRest,
+          tuplet: n.tuplet,
+          tieToNext: false,
+          isEgg: !!n.isEgg
+        }))
+      };
+    }
+
+    function cloneMeasure(m) {
+      return {
+        blocks: m.blocks.map(b => ({
+          blockId: b.blockId,
+          beats: b.beats,
+          tuplet: b.tuplet,
+          isEgg: !!b.isEgg,
+          notes: b.notes.map(n => ({ ...n }))
+        }))
+      };
+    }
+
+    /* ==========================================================================
+       4. 4-MEASURE DICTATION QUESTION GENERATOR ("🎲 產出新題")
+       ========================================================================== */
+
+    function generateNewPrompt() {
+      stopPlayback();
+
+      state.activeMeterKey = state.pendingMeterKey;
+      state.activeEggMode = state.eggMode;
+      state.hasPendingChanges = false;
+      state.isSubmitted = false;
+      state.gradeMarks = {};
+      state.playCount = 0;
+
+      document.getElementById('play-count-val').textContent = '0';
+      document.getElementById('pending-settings-notice').classList.add('hidden');
+      document.getElementById('grading-result-panel').classList.add('hidden');
+      document.getElementById('active-meter-pill').textContent = `當前考題拍號：${state.activeMeterKey}`;
+
+      const meter = getActiveMeter();
+      const halfBeatMode = isHalfBeatMeter(meter);
+      const slotUnit = meter.slotUnit; // 0.5 for /2 meters, 1.0 for /4 and /8
+
+      const activePool = RHYTHM_BLOCKS.filter(b =>
+        b.family === meter.family &&
+        !b.isEgg &&
+        b.beats <= meter.beats + 0.001 &&
+        state.enabledBlockIds.has(b.id)
+      );
+      const fallbackPool = RHYTHM_BLOCKS.filter(b =>
+        b.family === meter.family &&
+        !b.isEgg &&
+        b.beats <= meter.beats + 0.001 &&
+        b.basic1Beat
+      );
+      const pool = activePool.length > 0 ? activePool : fallbackPool;
+
+      // Easter egg pool (16th notes in /2 meters, 32nd notes in /4 & /8 meters)
+      const eggPool = RHYTHM_BLOCKS.filter(b =>
+        b.family === meter.family &&
+        b.isEgg &&
+        state.enabledBlockIds.has(b.id)
+      );
+      const eggFreq = state.activeEggMode === 'off' ? 0 : parseFloat(state.activeEggMode);
+
+      const totalSlotsPerMeasure = Math.round(meter.beats / slotUnit);
+      const planEggForHalf = () => {
+        if (eggFreq > 0 && eggPool.length > 0 && Math.random() < eggFreq) {
+          const pickedEgg = eggPool[Math.floor(Math.random() * eggPool.length)];
+          const eggSlots = Math.round(pickedEgg.beats / slotUnit);
+          const maxSlotIdx = Math.max(0, totalSlotsPerMeasure - eggSlots);
+          return {
+            active: true,
+            relMeasure: Math.random() < 0.5 ? 0 : 1,
+            beatTarget: Math.floor(Math.random() * (maxSlotIdx + 1)) * slotUnit,
+            blockDef: pickedEgg
+          };
+        }
+        return { active: false };
+      };
+
+      const eggFront = planEggForHalf();
+      const eggBack = planEggForHalf();
+      const promptTags = new Set();
+
+      for (let mIdx = 0; mIdx < 4; mIdx++) {
+        const blocks = [];
+        let beatsFilled = 0;
+        const eggPlan = mIdx < 2 ? eggFront : eggBack;
+        const relM = mIdx % 2;
+
+        while (beatsFilled < meter.beats - 0.001) {
+          const remaining = meter.beats - beatsFilled;
+
+          if (eggPlan.active && relM === eggPlan.relMeasure && Math.abs(beatsFilled - eggPlan.beatTarget) < 0.01 && remaining >= eggPlan.blockDef.beats - 0.001) {
+            blocks.push(instantiateBlock(eggPlan.blockDef));
+            if (mIdx < 2) promptTags.add(halfBeatMode ? '16分音符彩蛋' : '32分音符彩蛋');
+            beatsFilled += eggPlan.blockDef.beats;
+            continue;
+          }
+
+          let candidates = pool.filter(b => b.beats <= remaining + 0.001);
+          if (eggPlan.active && relM === eggPlan.relMeasure && beatsFilled < eggPlan.beatTarget) {
+            const maxBeforeEgg = eggPlan.beatTarget - beatsFilled;
+            const tight = candidates.filter(b => b.beats <= maxBeforeEgg + 0.001);
+            if (tight.length > 0) candidates = tight;
+          }
+          if (candidates.length === 0) {
+            candidates = fallbackPool.filter(b => b.beats <= remaining + 0.001);
+          }
+
+          // Avoid putting a rest as the very first event of Measure 1 or final beat of Measure 4 for clean musical phrasing
+          if ((mIdx === 0 && beatsFilled < 0.01) || (mIdx === 3 && remaining <= 1.01)) {
+            const nonRestCandidates = candidates.filter(c => !c.notes.some(n => n.isRest));
+            if (nonRestCandidates.length > 0) candidates = nonRestCandidates;
+          }
+
+          const weighted = [];
+          candidates.forEach(c => {
+            const hasRest = c.notes.some(n => n.isRest);
+            const weight = hasRest ? 1 : (c.isMultiBeat ? 1 : 2);
+            for (let w = 0; w < weight; w++) weighted.push(c);
+          });
+
+          const picked = weighted[Math.floor(Math.random() * weighted.length)];
+          blocks.push(instantiateBlock(picked));
+          if (mIdx < 2) collectFeatureTag(picked, promptTags);
+          beatsFilled += picked.beats;
+        }
+
+        state.solutionMeasures[mIdx] = { blocks };
+      }
+
+      // Apply exact tie count based on tieMode ('none': 0, 'low': 1-2, 'medium': 3-4)
+      applySolutionTies(promptTags);
+
+      // Copy M0 and M1 into visible prompt measures; clear M2 and M3 for student dictation
+      state.measures[0] = cloneMeasure(state.solutionMeasures[0]);
+      state.measures[1] = cloneMeasure(state.solutionMeasures[1]);
+
+      // Hide cross-barline tie from M1 into M2 until student adds notes or submits
+      const m1Blocks = state.measures[1].blocks;
+      if (m1Blocks.length > 0) {
+        const lastNote = m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1];
+        if (lastNote) lastNote.tieToNext = false;
+      }
+
+      state.measures[2] = { blocks: [] };
+      state.measures[3] = { blocks: [] };
+      state.studentHistory = [];
+
+      updatePromptFeatureBadge(promptTags);
+      renderAll();
+      showToast(`🎲 已產出新的 ${state.activeMeterKey} 拍四小節考題`);
+    }
+
+    function collectFeatureTag(blk, tagSet) {
+      if (blk.tuplet === 3) tagSet.add('三連音');
+      if (blk.notes.some(n => n.isRest)) tagSet.add('休止符');
+      if (blk.id.includes('dot')) tagSet.add('附點');
+      if (blk.id.includes('sync')) tagSet.add('切分音');
+      if (blk.id.includes('16') || blk.id.includes('s')) tagSet.add('細分音型');
+      if (blk.isMultiBeat) tagSet.add('長音/跨拍');
+    }
+
+    function applySolutionTies(promptTags) {
+      let targetTies = 0;
+      if (state.tieMode === 'low') {
+        targetTies = Math.random() < 0.5 ? 1 : 2;
+      } else if (state.tieMode === 'medium') {
+        targetTies = Math.random() < 0.5 ? 3 : 4;
+      }
+      if (targetTies === 0) return;
+
+      const flatNotes = [];
+      for (let mIdx = 0; mIdx < 4; mIdx++) {
+        state.solutionMeasures[mIdx].blocks.forEach((blk) => {
+          blk.notes.forEach((n, nIdx) => {
+            flatNotes.push({
+              mIdx,
+              isLastInBlock: nIdx === blk.notes.length - 1,
+              note: n
+            });
+          });
+        });
+      }
+
+      const eligibleIndices = [];
+      for (let i = 0; i < flatNotes.length - 1; i++) {
+        const curr = flatNotes[i];
+        const next = flatNotes[i + 1];
+        if (!curr.isLastInBlock) continue;
+        // Both notes must be sounding notes (never tie into or out of a rest)
+        if (curr.note.isRest || next.note.isRest) continue;
+        if (curr.note.isEgg || next.note.isEgg) continue;
+        if (curr.note.dur < 0.124 || next.note.dur < 0.124) continue;
+        eligibleIndices.push(i);
+      }
+
+      for (let i = eligibleIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [eligibleIndices[i], eligibleIndices[j]] = [eligibleIndices[j], eligibleIndices[i]];
+      }
+
+      const chosen = eligibleIndices.slice(0, targetTies);
+      chosen.forEach(idx => {
+        flatNotes[idx].note.tieToNext = true;
+        if (flatNotes[idx].mIdx < 2) {
+          promptTags.add('連結線');
+        }
+      });
+    }
+
+    function updatePromptFeatureBadge(usedTags) {
+      const badge = document.getElementById('prompt-feature-badge');
+      badge.textContent = usedTags.size > 0
+        ? '題幹元素：' + Array.from(usedTags).join(' · ')
+        : '題幹元素：基礎節奏';
+    }
+
+    /* ==========================================================================
+       5. STUDENT DICTATION INPUT & DRAG-AND-DROP ENGINE (SUPPORTS 0.5-BEAT SLOTS)
+       ========================================================================== */
+
+    function pushStudentHistory() {
+      const m1Blocks = state.measures[1].blocks;
+      const m1LastTie = (m1Blocks.length > 0 && m1Blocks[m1Blocks.length - 1].notes.length > 0)
+        ? m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1].tieToNext
+        : false;
+
+      state.studentHistory.push({
+        m1LastTie,
+        m2: cloneMeasure(state.measures[2]),
+        m3: cloneMeasure(state.measures[3])
+      });
+      if (state.studentHistory.length > 40) state.studentHistory.shift();
+    }
+
+    function insertBlockQuickTap(blockId) {
+      if (state.isSubmitted) {
+        showToast('🔒 本題已公布答案，請按「🎲 產出新題」開始下一題');
+        return;
+      }
+      const blkDef = RHYTHM_BLOCKS.find(b => b.id === blockId);
+      if (!blkDef) return;
+      const meter = getActiveMeter();
+      if (blkDef.family !== meter.family) return;
+
+      const remM2 = meter.beats - getMeasureUsedBeats(2);
+      const remM3 = meter.beats - getMeasureUsedBeats(3);
+
+      let targetMeasureIdx = -1;
+      if (remM2 >= blkDef.beats - 0.001) {
+        targetMeasureIdx = 2;
+      } else if (remM2 < 0.001 && remM3 >= blkDef.beats - 0.001) {
+        targetMeasureIdx = 3;
+      } else {
+        showToast(`⚠️ 剩餘拍數不足以放入此音型（需 ${blkDef.beats} 拍）`);
+        return;
+      }
+
+      pushStudentHistory();
+      state.measures[targetMeasureIdx].blocks.push(instantiateBlock(blkDef));
+      sanitizeDanglingTies();
+      renderAll();
+
+      const freshTile = document.querySelector(`#answer-palette-grid .rhythm-tile[data-block-id="${blockId}"]`);
+      if (freshTile) {
+        freshTile.classList.remove('tile-flash');
+        void freshTile.offsetWidth;
+        freshTile.classList.add('tile-flash');
+      }
+    }
+
+    function removePlacedBlock(measureIdx, blockIdx) {
+      if (state.isSubmitted || measureIdx < 2 || measureIdx > 3) return;
+      stopPlayback();
+      pushStudentHistory();
+
+      if (blockIdx > 0) {
+        const prevBlk = state.measures[measureIdx].blocks[blockIdx - 1];
+        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+      } else if (measureIdx === 3 && state.measures[2].blocks.length > 0) {
+        const prevBlk = state.measures[2].blocks[state.measures[2].blocks.length - 1];
+        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+      } else if (measureIdx === 2 && state.measures[1].blocks.length > 0) {
+        const prevBlk = state.measures[1].blocks[state.measures[1].blocks.length - 1];
+        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+      }
+
+      state.measures[measureIdx].blocks.splice(blockIdx, 1);
+      sanitizeDanglingTies();
+      renderAll();
+    }
+
+    function undoStudentBlock() {
+      if (state.isSubmitted || state.studentHistory.length === 0) return;
+      stopPlayback();
+      const prev = state.studentHistory.pop();
+      const m1Blocks = state.measures[1].blocks;
+      if (m1Blocks.length > 0 && m1Blocks[m1Blocks.length - 1].notes.length > 0) {
+        m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1].tieToNext = prev.m1LastTie;
+      }
+      state.measures[2] = prev.m2;
+      state.measures[3] = prev.m3;
+      sanitizeDanglingTies();
+      renderAll();
+    }
+
+    function clearStudentMeasures() {
+      if (state.isSubmitted) return;
+      if (state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0) return;
+      stopPlayback();
+      pushStudentHistory();
+      const m1Blocks = state.measures[1].blocks;
+      if (m1Blocks.length > 0) {
+        const lastBlk = m1Blocks[m1Blocks.length - 1];
+        if (lastBlk.notes.length > 0) lastBlk.notes[lastBlk.notes.length - 1].tieToNext = false;
+      }
+      state.measures[2] = { blocks: [] };
+      state.measures[3] = { blocks: [] };
+      renderAll();
+      showToast('已清空第 3–4 小節作答區');
+    }
+
+    function beginPalettePointerDown(e, blockId) {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (state.isSubmitted) {
+        showToast('🔒 本題已公布答案，請按「🎲 產出新題」開始下一題');
+        return;
+      }
+      const meter = getActiveMeter();
+      const blkDef = RHYTHM_BLOCKS.find(b => b.id === blockId);
+      if (!blkDef || blkDef.family !== meter.family) return;
+
+      dragState.active = true;
+      dragState.isDragging = false;
+      dragState.sourceType = 'palette';
+      dragState.blockId = blockId;
+      dragState.fromMeasureIdx = -1;
+      dragState.fromBlockIdx = -1;
+      dragState.startX = e.clientX;
+      dragState.startY = e.clientY;
+      dragState.hoverTarget = null;
+    }
+
+    function beginPlacedPointerDown(e, measureIdx, blockIdx) {
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.delete-placed-btn')) return;
+      if (e.target.closest('.tieable-notehead')) return;
+      if (state.isSubmitted) return;
+
+      const blk = state.measures[measureIdx].blocks[blockIdx];
+      if (!blk) return;
+
+      dragState.active = true;
+      dragState.isDragging = false;
+      dragState.sourceType = 'placed';
+      dragState.blockId = blk.blockId;
+      dragState.fromMeasureIdx = measureIdx;
+      dragState.fromBlockIdx = blockIdx;
+      dragState.startX = e.clientX;
+      dragState.startY = e.clientY;
+      dragState.hoverTarget = null;
+    }
+
+    function handleGlobalPointerMove(e) {
+      if (!dragState.active) return;
+
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+
+      if (!dragState.isDragging) {
+        if (Math.hypot(dx, dy) < 6) return;
+        dragState.isDragging = true;
+        showDragGhost(dragState.blockId);
+      }
+
+      const ghost = document.getElementById('drag-ghost');
+      ghost.style.left = `${e.clientX}px`;
+      ghost.style.top = `${e.clientY}px`;
+
+      evaluateDropHover(e.clientX, e.clientY);
+    }
+
+    function showDragGhost(blockId) {
+      const blkDef = RHYTHM_BLOCKS.find(b => b.id === blockId);
+      if (!blkDef) return;
+      const ghost = document.getElementById('drag-ghost');
+      ghost.innerHTML = `
+        <div class="w-full flex justify-between items-center text-[10px] font-extrabold text-emerald-700 mb-0.5">
+          <span>放入</span>
+          <span class="bg-emerald-100 px-1.5 rounded">${blkDef.beats}拍</span>
+        </div>
+        ${renderMiniBlockSVG(blkDef, getActiveMeter())}
+      `;
+      ghost.classList.remove('hidden');
+    }
+
+    function evaluateDropHover(clientX, clientY) {
+      clearDropSlotHighlights();
+      dragState.hoverTarget = null;
+
+      const blkDef = RHYTHM_BLOCKS.find(b => b.id === dragState.blockId);
+      if (!blkDef) return;
+      const meter = getActiveMeter();
+      const slotUnit = meter.slotUnit; // 0.5 for /2 meters, 1.0 for /4 and /8
+      const spanBeats = blkDef.beats;
+
+      for (let mIdx = 2; mIdx <= 3; mIdx++) {
+        const slotContainer = document.getElementById(`measure-slot-${mIdx}`);
+        if (!slotContainer) continue;
+        const rect = slotContainer.getBoundingClientRect();
+        if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+          const dropZones = slotContainer.querySelectorAll('.beat-drop-zone');
+          let hoveredStartBeat = 0;
+          if (dropZones.length > 0) {
+            dropZones.forEach((dz) => {
+              const dzRect = dz.getBoundingClientRect();
+              if (clientX >= dzRect.left) {
+                hoveredStartBeat = parseFloat(dz.dataset.startBeat);
+              }
+            });
+          } else {
+            const relX = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width));
+            const totalSlots = Math.round(meter.beats / slotUnit);
+            hoveredStartBeat = Math.floor(relX * totalSlots) * slotUnit;
+          }
+
+          const existingBlocks = state.measures[mIdx].blocks.filter((_, idx) =>
+            !(dragState.sourceType === 'placed' && dragState.fromMeasureIdx === mIdx && idx === dragState.fromBlockIdx)
+          );
+          const usedBeats = existingBlocks.reduce((s, b) => s + b.beats, 0);
+
+          if (usedBeats + spanBeats <= meter.beats + 0.001) {
+            let accBeat = 0;
+            let insertIdx = existingBlocks.length;
+            for (let i = 0; i < existingBlocks.length; i++) {
+              const midBeat = accBeat + existingBlocks[i].beats * 0.5;
+              if (hoveredStartBeat < midBeat - 0.001) {
+                insertIdx = i;
+                break;
+              }
+              accBeat += existingBlocks[i].beats;
+            }
+            const previewStartBeat = Math.min(meter.beats - spanBeats, accBeat);
+            highlightMeasureBeats(mIdx, previewStartBeat, spanBeats, 'insert');
+            dragState.hoverTarget = {
+              measureIdx: mIdx,
+              mode: 'insert',
+              insertIdx,
+              valid: true
+            };
+            return;
+          }
+
+          if (hoveredStartBeat + spanBeats <= meter.beats + 0.001) {
+            highlightMeasureBeats(mIdx, hoveredStartBeat, spanBeats, 'replace');
+            dragState.hoverTarget = {
+              measureIdx: mIdx,
+              mode: 'replace',
+              startBeat: hoveredStartBeat,
+              spanBeats,
+              valid: true
+            };
+            return;
+          }
+
+          highlightMeasureBeats(mIdx, hoveredStartBeat, Math.min(spanBeats, meter.beats - hoveredStartBeat), 'invalid');
+          dragState.hoverTarget = {
+            measureIdx: mIdx,
+            mode: 'invalid',
+            valid: false
+          };
+          return;
+        }
+      }
+    }
+
+    function highlightMeasureBeats(measureIdx, startBeat, spanBeats, status) {
+      const container = document.getElementById(`measure-slot-${measureIdx}`);
+      if (!container) return;
+
+      if (status === 'insert') {
+        container.classList.add('border-emerald-500', 'bg-emerald-50/40');
+      } else if (status === 'replace') {
+        container.classList.add('border-amber-500', 'bg-amber-50/40');
+      } else {
+        container.classList.add('border-rose-500', 'bg-rose-50/40');
+      }
+
+      const zones = container.querySelectorAll('.beat-drop-zone');
+      zones.forEach((z) => {
+        const zStart = parseFloat(z.dataset.startBeat);
+        const zDur = parseFloat(z.dataset.durBeat);
+        const overlaps = (zStart + zDur > startBeat + 0.001) && (zStart < startBeat + spanBeats - 0.001);
+        if (overlaps) {
+          if (status === 'insert') {
+            z.setAttribute('fill', '#10b981');
+            z.setAttribute('fill-opacity', '0.28');
+            z.setAttribute('stroke', '#059669');
+          } else if (status === 'replace') {
+            z.setAttribute('fill', '#f59e0b');
+            z.setAttribute('fill-opacity', '0.28');
+            z.setAttribute('stroke', '#d97706');
+          } else {
+            z.setAttribute('fill', '#f43f5e');
+            z.setAttribute('fill-opacity', '0.28');
+            z.setAttribute('stroke', '#e11d48');
+          }
+        }
+      });
+    }
+
+    function clearDropSlotHighlights() {
+      for (let mIdx = 2; mIdx <= 3; mIdx++) {
+        const container = document.getElementById(`measure-slot-${mIdx}`);
+        if (!container) continue;
+        container.classList.remove('border-emerald-500', 'bg-emerald-50/40', 'border-amber-500', 'bg-amber-50/40', 'border-rose-500', 'bg-rose-50/40');
+        container.querySelectorAll('.beat-drop-zone').forEach(z => {
+          const defaultFill = z.dataset.defaultFill || '#10b981';
+          const defaultOpacity = z.dataset.defaultOpacity || '0.05';
+          const defaultStroke = z.dataset.defaultStroke || '#a7f3d0';
+          z.setAttribute('fill', defaultFill);
+          z.setAttribute('fill-opacity', defaultOpacity);
+          z.setAttribute('stroke', defaultStroke);
+        });
+      }
+    }
+
+    function handleGlobalPointerUp() {
+      if (!dragState.active) return;
+
+      const wasDragging = dragState.isDragging;
+      const sourceType = dragState.sourceType;
+      const blockId = dragState.blockId;
+      const hoverTarget = dragState.hoverTarget;
+
+      document.getElementById('drag-ghost').classList.add('hidden');
+      clearDropSlotHighlights();
+      dragState.active = false;
+      dragState.isDragging = false;
+
+      if (!wasDragging) {
+        if (sourceType === 'palette') {
+          insertBlockQuickTap(blockId);
+        }
+        return;
+      }
+
+      if (!hoverTarget) return;
+
+      if (!hoverTarget.valid) {
+        showToast('⚠️ 該位置剩餘拍數不足，請往前放置或選擇較短音型');
+        return;
+      }
+
+      const blkDef = RHYTHM_BLOCKS.find(b => b.id === blockId);
+      if (!blkDef) return;
+
+      stopPlayback();
+      pushStudentHistory();
+
+      let movedBlockObj = null;
+      if (sourceType === 'placed') {
+        movedBlockObj = state.measures[dragState.fromMeasureIdx].blocks.splice(dragState.fromBlockIdx, 1)[0];
+        movedBlockObj.notes.forEach(n => { n.tieToNext = false; });
+      } else {
+        movedBlockObj = instantiateBlock(blkDef);
+      }
+
+      const targetMeasure = state.measures[hoverTarget.measureIdx];
+
+      if (hoverTarget.mode === 'insert') {
+        targetMeasure.blocks.splice(hoverTarget.insertIdx, 0, movedBlockObj);
+      } else if (hoverTarget.mode === 'replace') {
+        const meter = getActiveMeter();
+        const newBlocks = [];
+        let cursorBeat = 0;
+        let inserted = false;
+
+        targetMeasure.blocks.forEach(b => {
+          const bStart = cursorBeat;
+          const bEnd = cursorBeat + b.beats;
+          const overlapStart = Math.max(bStart, hoverTarget.startBeat);
+          const overlapEnd = Math.min(bEnd, hoverTarget.startBeat + hoverTarget.spanBeats);
+
+          if (overlapEnd > overlapStart + 0.001) {
+            if (!inserted) {
+              newBlocks.push(movedBlockObj);
+              inserted = true;
+            }
+          } else {
+            if (!inserted && bStart >= hoverTarget.startBeat - 0.001) {
+              newBlocks.push(movedBlockObj);
+              inserted = true;
+            }
+            newBlocks.push(b);
+          }
+          cursorBeat += b.beats;
+        });
+
+        if (!inserted) newBlocks.push(movedBlockObj);
+
+        let total = 0;
+        targetMeasure.blocks = newBlocks.filter(b => {
+          if (total + b.beats <= meter.beats + 0.001) {
+            total += b.beats;
+            return true;
+          }
+          return false;
+        });
+      }
+
+      sanitizeDanglingTies();
+      renderAll();
+    }
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+
+    /* ==========================================================================
+       6. INTERACTIVE NOTEHEAD TIES (SOUNDING NOTES ONLY, SUPPORTS CROSS-BARLINE)
+       ========================================================================== */
+
+    function getFlattenedNotes(measuresArr = state.measures) {
+      const list = [];
+      for (let mIdx = 0; mIdx < 4; mIdx++) {
+        measuresArr[mIdx].blocks.forEach((blk, bIdx) => {
+          blk.notes.forEach((n, nIdx) => {
+            list.push({ mIdx, bIdx, nIdx, note: n });
+          });
+        });
+      }
+      return list;
+    }
+
+    function sanitizeDanglingTies() {
+      const flat = getFlattenedNotes(state.measures);
+      for (let i = 0; i < flat.length; i++) {
+        const curr = flat[i];
+        const next = flat[i + 1];
+        if (curr.note.isRest || !next || next.note.isRest) {
+          curr.note.tieToNext = false;
+        }
+      }
+    }
+
+    function isNoteheadTieable(measureIdx, blockIdx, noteIdx, measuresArr = state.measures) {
+      if (state.isSubmitted) return false;
+      const mBlocks = measuresArr[measureIdx].blocks;
+      if (!mBlocks[blockIdx]) return false;
+      const targetNote = mBlocks[blockIdx].notes[noteIdx];
+      if (!targetNote || targetNote.isRest) return false;
+
+      const isLastBlockInMeasure = (blockIdx === mBlocks.length - 1);
+      const isLastNoteInBlock = (noteIdx === mBlocks[blockIdx].notes.length - 1);
+      const isLastNoteInMeasure = isLastBlockInMeasure && isLastNoteInBlock;
+
+      if (measureIdx === 0) return false;
+      if (measureIdx === 1) return isLastNoteInMeasure;
+      if (measureIdx === 2) return true;
+      if (measureIdx === 3) return !isLastNoteInMeasure;
+      return false;
+    }
+
+    function toggleNoteHeadTie(measureIdx, blockIdx, noteIdx) {
+      if (state.isSubmitted) return;
+      if (!isNoteheadTieable(measureIdx, blockIdx, noteIdx)) return;
+
+      const flat = getFlattenedNotes(state.measures);
+      const flatIdx = flat.findIndex(item => item.mIdx === measureIdx && item.bIdx === blockIdx && item.nIdx === noteIdx);
+      if (flatIdx === -1) return;
+
+      const curr = flat[flatIdx];
+      const next = flat[flatIdx + 1];
+
+      if (!next) {
+        showToast('💡 請先在下一拍或下一小節放入音符，再點擊符頭建立連結線');
+        return;
+      }
+      if (next.note.isRest) {
+        showToast('⚠️ 休止符無法作為連結線對象');
+        return;
+      }
+
+      pushStudentHistory();
+      curr.note.tieToNext = !curr.note.tieToNext;
+      renderAll();
+    }
+
+    function getStudentTieableEntries() {
+      const entries = [];
+      const m1Blocks = state.measures[1].blocks;
+      if (m1Blocks.length > 0 && state.measures[2].blocks.length > 0) {
+        const lastBlk = m1Blocks[m1Blocks.length - 1];
+        const lastNote = lastBlk.notes[lastBlk.notes.length - 1];
+        if (lastNote && !lastNote.isRest) {
+          entries.push({ note: lastNote });
+        }
+      }
+      for (let mIdx = 2; mIdx <= 3; mIdx++) {
+        state.measures[mIdx].blocks.forEach(blk => {
+          blk.notes.forEach(n => {
+            if (!n.isRest) entries.push({ note: n });
+          });
+        });
+      }
+      return entries;
+    }
+
+    /* ==========================================================================
+       7. SOUNDING-DURATION EQUIVALENCE GRADING ENGINE ("送出並公布答案")
+       ========================================================================== */
+
+    function extractSoundingAndRestEvents(measuresArr) {
+      const meter = getActiveMeter();
+      const rawEvents = [];
+
+      // Track M1's final note solely for cross-barline ties into M2 beat 0
+      const m1Blocks = measuresArr[1].blocks;
+      if (m1Blocks.length > 0) {
+        const lastBlk = m1Blocks[m1Blocks.length - 1];
+        const lastNote = lastBlk.notes[lastBlk.notes.length - 1];
+        rawEvents.push({
+          isM1Tail: true,
+          beatPos: -lastNote.dur,
+          dur: lastNote.dur,
+          isRest: !!lastNote.isRest,
+          tieToNext: !lastNote.isRest && !!lastNote.tieToNext,
+          domId: null
+        });
+      }
+
+      let beatCursor = 0;
+      for (let mIdx = 2; mIdx <= 3; mIdx++) {
+        measuresArr[mIdx].blocks.forEach((blk, bIdx) => {
+          blk.notes.forEach((n, nIdx) => {
+            rawEvents.push({
+              isM1Tail: false,
+              beatPos: beatCursor,
+              dur: n.dur,
+              isRest: !!n.isRest,
+              tieToNext: !n.isRest && !!n.tieToNext,
+              domId: `note-m${mIdx}-b${bIdx}-n${nIdx}`
+            });
+            beatCursor += n.dur;
+          });
+        });
+        beatCursor = (mIdx - 1) * meter.beats;
+      }
+
+      // Merge tied sounding notes into true [onsetBeat, totalSoundingDur] intervals
+      const soundingIntervals = [];
+      const restEvents = [];
+      let i = 0;
+      while (i < rawEvents.length) {
+        const curr = rawEvents[i];
+        if (curr.isRest) {
+          if (!curr.isM1Tail) {
+            restEvents.push({
+              onsetBeat: curr.beatPos,
+              dur: curr.dur,
+              domId: curr.domId
+            });
+          }
+          i++;
+          continue;
+        }
+
+        let totalDur = curr.dur;
+        const memberDomIds = curr.domId ? [curr.domId] : [];
+        let j = i;
+        while (rawEvents[j].tieToNext && j + 1 < rawEvents.length && !rawEvents[j + 1].isRest) {
+          j++;
+          totalDur += rawEvents[j].dur;
+          if (rawEvents[j].domId) memberDomIds.push(rawEvents[j].domId);
+        }
+
+        if (!curr.isM1Tail || (curr.isM1Tail && j > i)) {
+          soundingIntervals.push({
+            onsetBeat: curr.beatPos,
+            soundingDur: totalDur,
+            isTiedChain: j > i,
+            memberDomIds
+          });
+        }
+        i = j + 1;
+      }
+
+      return { soundingIntervals, restEvents, rawEvents };
+    }
+
+    function submitAndGradeAnswer() {
+      if (state.isSubmitted) return;
+      stopPlayback();
+
+      const meter = getActiveMeter();
+      const usedM2 = getMeasureUsedBeats(2);
+      const usedM3 = getMeasureUsedBeats(3);
+      if (usedM2 < 0.01 && usedM3 < 0.01) {
+        showToast('⚠️ 請先在第 3–4 小節填入積木後再送出答案');
+        return;
+      }
+
+      const solData = extractSoundingAndRestEvents(state.solutionMeasures);
+      const stuData = extractSoundingAndRestEvents(state.measures);
+
+      const eps = 0.015;
+      const marks = {};
+      let matchedSoundingCount = 0;
+      let equivalentTieHits = 0;
+
+      // Default all student notes/rests to wrong unless matched
+      stuData.rawEvents.forEach(ev => {
+        if (ev.domId) {
+          marks[ev.domId] = { status: 'wrong', equivHit: false };
+        }
+      });
+
+      // Match sounding intervals [onsetBeat, soundingDur]
+      const matchedSolIndices = new Set();
+      stuData.soundingIntervals.forEach(stuEv => {
+        const solIdx = solData.soundingIntervals.findIndex((solEv, idx) =>
+          !matchedSolIndices.has(idx) &&
+          Math.abs(solEv.onsetBeat - stuEv.onsetBeat) < eps &&
+          Math.abs(solEv.soundingDur - stuEv.soundingDur) < eps
+        );
+
+        if (solIdx !== -1) {
+          matchedSolIndices.add(solIdx);
+          matchedSoundingCount++;
+          const solEv = solData.soundingIntervals[solIdx];
+          const isEquivConversion = (stuEv.isTiedChain !== solEv.isTiedChain);
+          if (isEquivConversion) equivalentTieHits++;
+
+          stuEv.memberDomIds.forEach(dId => {
+            marks[dId] = { status: 'correct', equivHit: isEquivConversion };
+          });
+        }
+      });
+
+      // Evaluate student rests: a rest is correct if no solution sounding event overlaps its silent window
+      let matchedRestCount = 0;
+      stuData.restEvents.forEach(stuRest => {
+        const rStart = stuRest.onsetBeat + eps;
+        const rEnd = stuRest.onsetBeat + stuRest.dur - eps;
+        const overlapsSound = solData.soundingIntervals.some(solEv => {
+          const sStart = Math.max(0, solEv.onsetBeat);
+          const sEnd = solEv.onsetBeat + solEv.soundingDur;
+          return sEnd > rStart && sStart < rEnd;
+        });
+        if (!overlapsSound) {
+          matchedRestCount++;
+          marks[stuRest.domId] = { status: 'correct', equivHit: false };
+        }
+      });
+
+      const totalSolItems = Math.max(solData.soundingIntervals.length + solData.restEvents.length, 1);
+      const totalStuItems = Math.max(stuData.soundingIntervals.length + stuData.restEvents.length, 1);
+      const denom = Math.max(totalSolItems, totalStuItems);
+      const rawPct = Math.round(((matchedSoundingCount + matchedRestCount) / denom) * 100);
+      const finalScore = Math.max(0, Math.min(100, rawPct));
+
+      state.gradeMarks = marks;
+      state.isSubmitted = true;
+
+      // Render Score Banner
+      const banner = document.getElementById('grading-score-banner');
+      const isCompleteBars = Math.abs(usedM2 - meter.beats) < 0.01 && Math.abs(usedM3 - meter.beats) < 0.01;
+      const isPerfect = finalScore === 100 && isCompleteBars;
+      const isGood = finalScore >= 75;
+
+      banner.className = `rounded-2xl border p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 ${
+        isPerfect
+          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+          : (isGood ? 'bg-sky-50 border-sky-300 text-sky-950' : 'bg-rose-50 border-rose-300 text-rose-950')
+      }`;
+
+      const equivBadgeHtml = equivalentTieHits > 0
+        ? `<span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">✨ 含 ${equivalentTieHits} 處連結線等效時值命中</span>`
+        : '';
+
+      const incompleteBadgeHtml = !isCompleteBars
+        ? `<span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">⚠️ 小節拍數未填滿</span>`
+        : '';
+
+      banner.innerHTML = `
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="text-2xl sm:text-3xl font-black px-3.5 py-1.5 rounded-xl bg-white border border-current/20 shadow-2xs">
+            ${finalScore} 分
+          </div>
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm sm:text-base font-black">
+                ${isPerfect ? '🎉 完全正確！實質發聲時值與解答完全一致' : (isGood ? '👏 表現不錯！請對照下方標準解答檢視細節' : '📝 已完成批改，請對照下方標準解答並重新試聽')}
+              </span>
+              ${equivBadgeHtml}
+              ${incompleteBadgeHtml}
+            </div>
+            <p class="text-xs font-semibold opacity-85">
+              實質發聲時值命中：<strong>${matchedSoundingCount} / ${solData.soundingIntervals.length}</strong> 組（以連結線組合出的音型若實質時值等同解答，均判定為 ✓ 正確）
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Reveal Official Answer Section
+      const solM1Blocks = state.solutionMeasures[1].blocks;
+      const hasCrossM2ToM3 = solM1Blocks.length > 0 &&
+        !solM1Blocks[solM1Blocks.length - 1].notes[solM1Blocks[solM1Blocks.length - 1].notes.length - 1].isRest &&
+        solM1Blocks[solM1Blocks.length - 1].notes[solM1Blocks[solM1Blocks.length - 1].notes.length - 1].tieToNext;
+
+      const crossNoteEl = document.getElementById('answer-cross-tie-note');
+      if (hasCrossM2ToM3) crossNoteEl.classList.remove('hidden');
+      else crossNoteEl.classList.add('hidden');
+
+      document.getElementById('grading-result-panel').classList.remove('hidden');
+      document.getElementById('ans-measure-slot-2').innerHTML = renderMeasureSVG(2, state.solutionMeasures, true);
+      document.getElementById('ans-measure-slot-3').innerHTML = renderMeasureSVG(3, state.solutionMeasures, true);
+
+      renderAll();
+      document.getElementById('grading-result-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    /* ==========================================================================
+       8. PRECISION SVG SCORE & MINI PALETTE ENGRAVING (NOTES + RESTS + HALF-BEATS)
+       ========================================================================== */
+
+    function renderRestSymbolSVG(head, dots, x, staffY, color = '#0f172a', scale = 1.0) {
+      let out = `<g class="note-rest" transform="translate(${x}, ${staffY}) scale(${scale})">`;
+      if (head === 'whole') {
+        out += `<rect x="-6.5" y="0" width="13" height="5" fill="${color}" />`;
+      } else if (head === 'half') {
+        out += `<rect x="-6.5" y="-5" width="13" height="5" fill="${color}" />`;
+      } else if (head === 'quarter') {
+        out += `<path d="M -2.5 -13 L 3.5 -5.5 L -2.5 0.5 L 3.5 7.5 C 0 6.5 -3.5 9.5 -1 13.5 C -4.5 11.5 -5 6.5 -1 5 L -4.5 0.5 L 1.2 -5.5 L -3.5 -11.5 Z" fill="${color}" />`;
+      } else {
+        // Eighth / 16th rest
+        out += `<circle cx="-2.8" cy="-5.5" r="2.2" fill="${color}" />`;
+        out += `<path d="M -2.5 -5.2 Q 1.5 -3.5 4.2 -7.5 L -1.2 10.5" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" />`;
+        if (head === 'solid_2') {
+          out += `<circle cx="-4.5" cy="1.2" r="2.1" fill="${color}" />`;
+          out += `<path d="M -4.2 1.5 Q -0.2 3.2 2.4 -0.6" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" />`;
+        }
+      }
+      for (let d = 0; d < dots; d++) {
+        out += `<circle cx="${8.5 + d * 4.8}" cy="-2.5" r="2.0" fill="${color}" />`;
+      }
+      out += `</g>`;
+      return out;
+    }
+
+    function renderMeasureSVG(measureIdx, measuresArr = state.measures, isSolutionView = false) {
+      const meter = getActiveMeter();
+      const halfBeatMode = isHalfBeatMeter(meter);
+      const measure = measuresArr[measureIdx];
+      const W = 460;
+      const H = 160;
+      const staffCenterY = 84;
+      const showTimeSig = (measureIdx === 0 || measureIdx === 2);
+      const leftPad = showTimeSig ? 56 : 20;
+      const rightPad = 18;
+      const contentWidth = W - leftPad - rightPad;
+
+      let svg = `<svg class="w-full h-auto block overflow-visible" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+      // 1. Measure Label
+      const labelColor = isSolutionView ? '#b45309' : (measureIdx < 2 ? '#4338ca' : '#047857');
+      const labelPrefix = isSolutionView ? '標準解答 · ' : '';
+      svg += `<text x="6" y="16" font-size="11" font-weight="800" fill="${labelColor}">${labelPrefix}第 ${measureIdx + 1} 小節</text>`;
+
+      // 2. Drop Zones for Student Measures 3 & 4 (Before Submission)
+      if (!isSolutionView && measureIdx >= 2 && !state.isSubmitted) {
+        const beatW = contentWidth / meter.beats;
+
+        if (halfBeatMode) {
+          // /2 meters: Every pair of half-beats enclosed inside ONE outer dashed frame, with two tinted inner slots separated by a central gap
+          for (let b = 0; b < meter.beats; b++) {
+            const bx = leftPad + b * beatW;
+            const outerX = bx + 2;
+            const outerW = beatW - 4;
+            const innerPad = 4;
+            const centerGap = 6;
+            const halfW = (outerW - innerPad * 2 - centerGap) / 2;
+
+            // Outer dashed group frame for 1 full beat (2 half-beats)
+            svg += `<rect x="${outerX}" y="22" width="${outerW}" height="112" rx="10" fill="none" stroke="#94a3b8" stroke-width="1.35" stroke-dasharray="4 3" />`;
+
+            // Left half-beat slot (soft emerald)
+            const h1X = outerX + innerPad;
+            svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b}" data-dur-beat="0.5" data-default-fill="#10b981" data-default-opacity="0.08" data-default-stroke="#6ee7b7" x="${h1X}" y="26" width="${halfW}" height="104" rx="6" fill="#10b981" fill-opacity="0.08" stroke="#6ee7b7" stroke-width="1" />`;
+
+            // Right half-beat slot (soft sky blue)
+            const h2X = h1X + halfW + centerGap;
+            svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b + 0.5}" data-dur-beat="0.5" data-default-fill="#0ea5e9" data-default-opacity="0.08" data-default-stroke="#7dd3fc" x="${h2X}" y="26" width="${halfW}" height="104" rx="6" fill="#0ea5e9" fill-opacity="0.08" stroke="#7dd3fc" stroke-width="1" />`;
+
+            svg += `<text x="${bx + beatW / 2}" y="147" font-size="10" font-weight="700" text-anchor="middle" fill="#64748b">第${b + 1}拍（半+半）</text>`;
+          }
+        } else {
+          // Standard 1-beat drop zones for /4 and /8 meters
+          for (let b = 0; b < meter.beats; b++) {
+            const bx = leftPad + b * beatW;
+            svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b}" data-dur-beat="1" data-default-fill="#10b981" data-default-opacity="0.04" data-default-stroke="#a7f3d0" x="${bx + 2}" y="24" width="${beatW - 4}" height="108" rx="8" fill="#10b981" fill-opacity="0.04" stroke="#a7f3d0" stroke-width="1.2" stroke-dasharray="4 3" />`;
+            svg += `<text x="${bx + beatW / 2}" y="146" font-size="10" font-weight="700" text-anchor="middle" fill="#6ee7b7">第${b + 1}拍</text>`;
+          }
+        }
+      }
+
+      // 3. Beat Pulse Ruler Ticks
+      for (let b = 0; b < meter.beats; b++) {
+        const tx = leftPad + (b / meter.beats) * contentWidth;
+        svg += `<line x1="${tx}" y1="21" x2="${tx}" y2="29" stroke="#cbd5e1" stroke-width="1.3" />`;
+      }
+
+      // 4. Staff Lines
+      if (state.staffStyle === 'five') {
+        for (let line = -2; line <= 2; line++) {
+          const ly = staffCenterY + line * 11;
+          svg += `<line x1="4" y1="${ly}" x2="${W - 4}" y2="${ly}" stroke="#94a3b8" stroke-width="1.1" />`;
+        }
+      } else {
+        svg += `<line x1="4" y1="${staffCenterY}" x2="${W - 4}" y2="${staffCenterY}" stroke="#475569" stroke-width="1.6" />`;
+      }
+
+      // 5. Barlines
+      svg += `<line x1="4" y1="${staffCenterY - 22}" x2="4" y2="${staffCenterY + 22}" stroke="#1e293b" stroke-width="1.8" />`;
+      if (measureIdx === 3) {
+        svg += `<line x1="${W - 9}" y1="${staffCenterY - 22}" x2="${W - 9}" y2="${staffCenterY + 22}" stroke="#1e293b" stroke-width="1.5" />`;
+        svg += `<line x1="${W - 4}" y1="${staffCenterY - 22}" x2="${W - 4}" y2="${staffCenterY + 22}" stroke="#1e293b" stroke-width="4" />`;
+      } else {
+        svg += `<line x1="${W - 4}" y1="${staffCenterY - 22}" x2="${W - 4}" y2="${staffCenterY + 22}" stroke="#1e293b" stroke-width="1.8" />`;
+      }
+
+      // 6. Percussion Clef & Time Signature
+      if (showTimeSig) {
+        svg += `<rect x="11" y="${staffCenterY - 12}" width="3.5" height="24" fill="#1e293b" rx="1" />`;
+        svg += `<rect x="17.5" y="${staffCenterY - 12}" width="3.5" height="24" fill="#1e293b" rx="1" />`;
+        svg += `<text x="37" y="${staffCenterY - 3}" font-size="22" font-weight="900" font-family="Georgia, serif" text-anchor="middle" fill="#0f172a">${meter.num}</text>`;
+        svg += `<text x="37" y="${staffCenterY + 20}" font-size="22" font-weight="900" font-family="Georgia, serif" text-anchor="middle" fill="#0f172a">${meter.den}</text>`;
+      }
+
+      // 7. Placed Blocks & Notes/Rests
+      const noteCoords = [];
+      let beatCursor = 0;
+
+      measure.blocks.forEach((blk, bIdx) => {
+        const blkStartX = leftPad + (beatCursor / meter.beats) * contentWidth;
+        const blkWidth = (blk.beats / meter.beats) * contentWidth;
+
+        // Drag Handle & Delete Pill for Student Measures 3 & 4 (Before Submission)
+        if (!isSolutionView && measureIdx >= 2 && !state.isSubmitted) {
+          const pillW = Math.max(32, blkWidth - 6);
+          const pillX = blkStartX + 3;
+          svg += `
+            <g class="cursor-grab" onpointerdown="beginPlacedPointerDown(event, ${measureIdx}, ${bIdx})">
+              <rect x="${pillX}" y="25" width="${pillW}" height="17" rx="5" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1" />
+              <text x="${pillX + 6}" y="36.5" font-size="9.5" font-weight="800" fill="#047857">⠿ ${blk.beats}拍</text>
+              <g class="delete-placed-btn cursor-pointer" onclick="event.stopPropagation(); removePlacedBlock(${measureIdx}, ${bIdx})">
+                <circle cx="${pillX + pillW - 8}" cy="33.5" r="6" fill="#ffe4e6" />
+                <text x="${pillX + pillW - 8}" y="36.8" font-size="9.5" font-weight="900" text-anchor="middle" fill="#be123c">×</text>
+              </g>
+            </g>
+          `;
+        }
+
+        const blkNotes = [];
+        let subBeatCursor = beatCursor;
+        blk.notes.forEach((n, nIdx) => {
+          const wq = getWrittenQuarters(n.dur, n.tuplet, meter);
+          const vis = writtenQuartersToVisual(wq);
+          const noteStartX = leftPad + (subBeatCursor / meter.beats) * contentWidth;
+          const noteW = (n.dur / meter.beats) * contentWidth;
+          const x = noteStartX + Math.min(18, Math.max(9, noteW * 0.25));
+          const domId = isSolutionView ? `sol-note-m${measureIdx}-b${bIdx}-n${nIdx}` : `note-m${measureIdx}-b${bIdx}-n${nIdx}`;
+
+          const coordObj = {
+            x,
+            dur: n.dur,
+            isRest: !!n.isRest,
+            vis,
+            tieToNext: !n.isRest && !!n.tieToNext,
+            domId
+          };
+          blkNotes.push(coordObj);
+          noteCoords.push(coordObj);
+          subBeatCursor += n.dur;
+        });
+
+        svg += renderBlockBeamsAndTuplet(blkNotes, blk.tuplet, staffCenterY);
+
+        blkNotes.forEach((nc, nIdx) => {
+          const { head, stem, dots } = nc.vis;
+          const canTie = !isSolutionView && isNoteheadTieable(measureIdx, bIdx, nIdx, measuresArr);
+          const groupClasses = `note-group${canTie ? ' tieable-notehead' : ''}${nc.tieToNext ? ' is-tied' : ''}`;
+          const clickAttr = canTie
+            ? `onpointerdown="event.stopPropagation()" onclick="event.stopPropagation(); toggleNoteHeadTie(${measureIdx}, ${bIdx}, ${nIdx})"`
+            : '';
+
+          let noteStrokeFill = '#0f172a';
+          const gMark = (!isSolutionView && state.isSubmitted && measureIdx >= 2) ? state.gradeMarks[nc.domId] : null;
+          if (gMark) {
+            noteStrokeFill = gMark.status === 'correct' ? '#059669' : '#e11d48';
+          }
+
+          svg += `<g id="${nc.domId}" class="${groupClasses}" ${clickAttr}>`;
+
+          if (nc.isRest) {
+            const restType = nc.vis.beams >= 2 ? 'solid_2' : head;
+            svg += renderRestSymbolSVG(restType, dots, nc.x, staffCenterY, noteStrokeFill, 1.0);
+          } else {
+            if (canTie) {
+              svg += `<title>${nc.tieToNext ? '點擊符頭：取消連結線' : '點擊符頭：建立連向下一音的連結線'}</title>`;
+              svg += `<circle class="notehead-ring" cx="${nc.x}" cy="${staffCenterY}" r="11.5" fill="rgba(251, 191, 36, 0.16)" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="2.5 2" />`;
+            }
+
+            if (head === 'whole') {
+              svg += `<ellipse class="notehead" cx="${nc.x}" cy="${staffCenterY}" rx="7.2" ry="4.8" fill="#ffffff" stroke="${noteStrokeFill}" stroke-width="2.2" />`;
+            } else if (head === 'half') {
+              svg += `<ellipse class="notehead" cx="${nc.x}" cy="${staffCenterY}" rx="6.4" ry="4.5" transform="rotate(-18 ${nc.x} ${staffCenterY})" fill="#ffffff" stroke="${noteStrokeFill}" stroke-width="2.1" />`;
+            } else {
+              svg += `<ellipse class="notehead" cx="${nc.x}" cy="${staffCenterY}" rx="6.1" ry="4.3" transform="rotate(-18 ${nc.x} ${staffCenterY})" fill="${noteStrokeFill}" />`;
+            }
+
+            if (stem) {
+              svg += `<line class="note-stem" x1="${nc.x + 5.2}" y1="${staffCenterY - 1}" x2="${nc.x + 5.2}" y2="${staffCenterY - 33}" stroke="${noteStrokeFill}" stroke-width="1.8" />`;
+            }
+
+            for (let d = 0; d < dots; d++) {
+              svg += `<circle class="note-dot" cx="${nc.x + 11 + d * 5.2}" cy="${staffCenterY - 4}" r="2.2" fill="${noteStrokeFill}" />`;
+            }
+
+            if (canTie) {
+              svg += `<circle cx="${nc.x}" cy="${staffCenterY}" r="14.5" fill="transparent" />`;
+            }
+          }
+
+          if (gMark) {
+            const badgeText = gMark.status === 'correct' ? '✓' : '✗';
+            svg += `<text x="${nc.x}" y="${staffCenterY + 35}" font-size="13" font-weight="900" text-anchor="middle" fill="${noteStrokeFill}">${badgeText}</text>`;
+          }
+
+          svg += `</g>`;
+        });
+
+        beatCursor += blk.beats;
+      });
+
+      // 8. Ties
+      svg += renderMeasureTies(measureIdx, noteCoords, leftPad, W - rightPad, staffCenterY, measuresArr);
+
+      // 9. Empty Placeholder Guide
+      if (!isSolutionView && measureIdx >= 2 && measure.blocks.length === 0 && !state.isSubmitted) {
+        svg += `<text x="${leftPad + contentWidth / 2}" y="${staffCenterY + 35}" font-size="11.5" font-weight="700" text-anchor="middle" fill="#64748b">拖曳或點擊下方積木填入</text>`;
+      }
+
+      // 10. Real-Time Playback Cursor
+      const cursorId = isSolutionView ? `sol-cursor-m${measureIdx}` : `cursor-m${measureIdx}`;
+      svg += `<line id="${cursorId}" x1="${leftPad}" y1="18" x2="${leftPad}" y2="${H - 12}" stroke="#dc2626" stroke-width="2.8" stroke-linecap="round" opacity="0" />`;
+
+      svg += `</svg>`;
+      return svg;
+    }
+
+    function renderBlockBeamsAndTuplet(blkNotes, tuplet, staffCenterY) {
+      let out = '';
+      const stemHeight = 33;
+      const beamTopY = staffCenterY - stemHeight;
+      const beamThickness = 3.6;
+      const beamGap = 5.4;
+
+      let i = 0;
+      while (i < blkNotes.length) {
+        if (blkNotes[i].isRest || blkNotes[i].vis.beams === 0) {
+          i++;
+          continue;
+        }
+        let j = i;
+        while (j + 1 < blkNotes.length && !blkNotes[j + 1].isRest && blkNotes[j + 1].vis.beams >= 1) j++;
+
+        if (i === j) {
+          const nc = blkNotes[i];
+          const sx = nc.x + 5.2;
+          for (let f = 0; f < nc.vis.beams; f++) {
+            const fy = beamTopY + f * 5.5;
+            out += `<path class="note-flag" d="M ${sx} ${fy} Q ${sx + 9} ${fy + 5} ${sx + 6} ${fy + 14}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
+          }
+        } else {
+          const firstStemX = blkNotes[i].x + 5.2;
+          const lastStemX = blkNotes[j].x + 5.2;
+          out += `<rect x="${firstStemX - 0.6}" y="${beamTopY}" width="${lastStemX - firstStemX + 1.2}" height="${beamThickness}" fill="#0f172a" />`;
+
+          for (let level = 2; level <= 3; level++) {
+            const yOffset = beamTopY + (level - 1) * beamGap;
+            let k = i;
+            while (k <= j) {
+              if (blkNotes[k].vis.beams < level) { k++; continue; }
+              let m = k;
+              while (m + 1 <= j && blkNotes[m + 1].vis.beams >= level) m++;
+
+              if (m > k) {
+                const x1 = blkNotes[k].x + 5.2;
+                const x2 = blkNotes[m].x + 5.2;
+                out += `<rect x="${x1 - 0.6}" y="${yOffset}" width="${x2 - x1 + 1.2}" height="${beamThickness}" fill="#0f172a" />`;
+              } else {
+                const sx = blkNotes[k].x + 5.2;
+                const stubLen = 8.5;
+                let dir = -1;
+                if (k === i) dir = 1;
+                else if (k === j) dir = -1;
+                else dir = blkNotes[k - 1].dur >= blkNotes[k + 1].dur ? -1 : 1;
+                out += `<rect x="${dir === 1 ? sx : sx - stubLen}" y="${yOffset}" width="${stubLen}" height="${beamThickness}" fill="#0f172a" />`;
+              }
+              k = m + 1;
+            }
+          }
+        }
+        i = j + 1;
+      }
+
+      if (tuplet) {
+        const x1 = blkNotes[0].x - 3;
+        const x2 = blkNotes[blkNotes.length - 1].x + 11;
+        const midX = (x1 + x2) / 2;
+        const bracketY = beamTopY - 11;
+        out += `<path d="M ${x1} ${bracketY + 5} L ${x1} ${bracketY} L ${midX - 9} ${bracketY}" fill="none" stroke="#1e293b" stroke-width="1.3" />`;
+        out += `<path d="M ${midX + 9} ${bracketY} L ${x2} ${bracketY} L ${x2} ${bracketY + 5}" fill="none" stroke="#1e293b" stroke-width="1.3" />`;
+        out += `<text x="${midX}" y="${bracketY + 4}" font-size="12" font-weight="800" font-style="italic" font-family="Georgia, serif" text-anchor="middle" fill="#0f172a">${tuplet}</text>`;
+      }
+
+      return out;
+    }
+
+    function renderMeasureTies(measureIdx, noteCoords, leftBoundX, rightBoundX, staffCenterY, measuresArr) {
+      let out = '';
+      const tieY = staffCenterY + 10;
+
+      if (measureIdx > 0 && noteCoords.length > 0 && !noteCoords[0].isRest) {
+        const prevBlocks = measuresArr[measureIdx - 1].blocks;
+        if (prevBlocks.length > 0) {
+          const prevLastBlk = prevBlocks[prevBlocks.length - 1];
+          const prevLastNote = prevLastBlk.notes[prevLastBlk.notes.length - 1];
+          if (prevLastNote && !prevLastNote.isRest && prevLastNote.tieToNext) {
+            const x1 = leftBoundX - 10;
+            const x2 = noteCoords[0].x - 2;
+            out += `<path d="M ${x1} ${tieY} Q ${(x1 + x2) / 2} ${tieY + 11} ${x2} ${tieY}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
+          }
+        }
+      }
+
+      for (let i = 0; i < noteCoords.length; i++) {
+        const nc = noteCoords[i];
+        if (nc.isRest || !nc.tieToNext) continue;
+
+        if (i < noteCoords.length - 1) {
+          const nextNc = noteCoords[i + 1];
+          if (nextNc.isRest) continue;
+          const x1 = nc.x + 2;
+          const x2 = nextNc.x - 2;
+          const span = Math.max(18, x2 - x1);
+          const sag = Math.min(16, 8 + span * 0.12);
+          out += `<path d="M ${x1} ${tieY} Q ${(x1 + x2) / 2} ${tieY + sag} ${x2} ${tieY}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
+        } else if (measureIdx < 3) {
+          const nextMeasureBlocks = measuresArr[measureIdx + 1].blocks;
+          if (nextMeasureBlocks.length > 0 && !nextMeasureBlocks[0].notes[0].isRest) {
+            const x1 = nc.x + 2;
+            const x2 = rightBoundX + 10;
+            out += `<path d="M ${x1} ${tieY} Q ${(x1 + x2) / 2} ${tieY + 11} ${x2} ${tieY}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
+          }
+        }
+      }
+
+      return out;
+    }
+
+    function renderMiniBlockSVG(blockDef, meterObjOverride = null) {
+      const currentMeter = meterObjOverride || getActiveMeter();
+      let meterObj = currentMeter;
+      if (blockDef.family !== currentMeter.family) {
+        if (blockDef.family === 'simple_half') meterObj = METERS['4/2'];
+        else if (blockDef.family === 'compound') meterObj = METERS['6/8'];
+        else meterObj = METERS['4/4'];
+      }
+
+      const W = 72;
+      const H = 36;
+      const staffY = 26;
+      const stemH = 15;
+      const beamTopY = staffY - stemH;
+
+      const notes = blockDef.notes.map((n) => {
+        const wq = getWrittenQuarters(n.dur, n.tuplet, meterObj);
+        const vis = writtenQuartersToVisual(wq);
+        return { d: n.dur, isRest: !!n.isRest, vis, x: 0 };
+      });
+
+      const leftM = 10;
+      const rightM = W - 14;
+      if (notes.length === 1) {
+        notes[0].x = W / 2 - 2;
+      } else {
+        const step = (rightM - leftM) / (notes.length - 1);
+        notes.forEach((n, idx) => { n.x = leftM + idx * step; });
+      }
+
+      let svg = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+      svg += `<line x1="4" y1="${staffY}" x2="${W - 4}" y2="${staffY}" stroke="#cbd5e1" stroke-width="1" />`;
+
+      let i = 0;
+      while (i < notes.length) {
+        if (notes[i].isRest || notes[i].vis.beams === 0) { i++; continue; }
+        let j = i;
+        while (j + 1 < notes.length && !notes[j + 1].isRest && notes[j + 1].vis.beams >= 1) j++;
+
+        if (i === j) {
+          const sx = notes[i].x + 3.2;
+          for (let f = 0; f < notes[i].vis.beams; f++) {
+            const fy = beamTopY + f * 3.4;
+            svg += `<path d="M ${sx} ${fy} Q ${sx + 5} ${fy + 2.8} ${sx + 3.8} ${fy + 7.5}" fill="none" stroke="#0f172a" stroke-width="1.4" stroke-linecap="round" />`;
+          }
+        } else {
+          const x1 = notes[i].x + 3.2;
+          const x2 = notes[j].x + 3.2;
+          svg += `<rect x="${x1 - 0.4}" y="${beamTopY}" width="${x2 - x1 + 0.8}" height="2.2" fill="#0f172a" />`;
+
+          for (let level = 2; level <= 3; level++) {
+            const yOff = beamTopY + (level - 1) * 3.2;
+            let k = i;
+            while (k <= j) {
+              if (notes[k].vis.beams < level) { k++; continue; }
+              let m = k;
+              while (m + 1 <= j && notes[m + 1].vis.beams >= level) m++;
+              if (m > k) {
+                svg += `<rect x="${notes[k].x + 2.8}" y="${yOff}" width="${notes[m].x - notes[k].x + 0.8}" height="2.0" fill="#0f172a" />`;
+              } else {
+                const sx = notes[k].x + 3.2;
+                const dir = k === i ? 1 : (k === j ? -1 : (notes[k - 1].d >= notes[k + 1].d ? -1 : 1));
+                const stubLen = 4.5;
+                svg += `<rect x="${dir === 1 ? sx : sx - stubLen}" y="${yOff}" width="${stubLen}" height="2.0" fill="#0f172a" />`;
+              }
+              k = m + 1;
+            }
+          }
+        }
+        i = j + 1;
+      }
+
+      if (blockDef.tuplet) {
+        const bx1 = notes[0].x - 2;
+        const bx2 = notes[notes.length - 1].x + 6.5;
+        const mid = (bx1 + bx2) / 2;
+        const by = beamTopY - 4.5;
+        svg += `<path d="M ${bx1} ${by + 2.5} L ${bx1} ${by} L ${mid - 4.2} ${by}" fill="none" stroke="#334155" stroke-width="1" />`;
+        svg += `<path d="M ${mid + 4.2} ${by} L ${bx2} ${by} L ${bx2} ${by + 2.5}" fill="none" stroke="#334155" stroke-width="1" />`;
+        svg += `<text x="${mid}" y="${by + 2.4}" font-size="8" font-weight="800" font-style="italic" text-anchor="middle" fill="#0f172a">${blockDef.tuplet}</text>`;
+      }
+
+      notes.forEach(n => {
+        const { head, stem, dots } = n.vis;
+        if (n.isRest) {
+          const restType = n.vis.beams >= 2 ? 'solid_2' : head;
+          svg += renderRestSymbolSVG(restType, dots, n.x, staffY, '#0f172a', 0.62);
+        } else {
+          if (head === 'whole') {
+            svg += `<ellipse cx="${n.x}" cy="${staffY}" rx="4.3" ry="2.9" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />`;
+          } else if (head === 'half') {
+            svg += `<ellipse cx="${n.x}" cy="${staffY}" rx="3.9" ry="2.8" transform="rotate(-18 ${n.x} ${staffY})" fill="#ffffff" stroke="#0f172a" stroke-width="1.5" />`;
+          } else {
+            svg += `<ellipse cx="${n.x}" cy="${staffY}" rx="3.7" ry="2.6" transform="rotate(-18 ${n.x} ${staffY})" fill="#0f172a" />`;
+          }
+          if (stem) {
+            svg += `<line x1="${n.x + 3.2}" y1="${staffY - 0.8}" x2="${n.x + 3.2}" y2="${beamTopY}" stroke="#0f172a" stroke-width="1.3" />`;
+          }
+          for (let d = 0; d < dots; d++) {
+            svg += `<circle cx="${n.x + 6.6 + d * 3.1}" cy="${staffY - 2.5}" r="1.3" fill="#0f172a" />`;
+          }
+        }
+      });
+
+      svg += `</svg>`;
+      return svg;
+    }
+
+    /* ==========================================================================
+       9. UI RENDERING, 9-COLUMN BLOCK LIBRARIES & COLOR CODING
+       ========================================================================== */
+
+    function getBlockColorTheme(blk) {
+      // Compound groups
+      if (blk.colorGroup === 'dot8_16_8') {
+        return {
+          selector: 'bg-teal-50 border-teal-200',
+          palette: 'bg-teal-50 border-teal-200 hover:border-teal-500'
+        };
+      }
+      if (blk.colorGroup === 'two16_two8') {
+        return {
+          selector: 'bg-purple-50 border-purple-200',
+          palette: 'bg-purple-50 border-purple-200 hover:border-purple-500'
+        };
+      }
+      if (blk.colorGroup === 'dot8_three16') {
+        return {
+          selector: 'bg-rose-50 border-rose-200',
+          palette: 'bg-rose-50 border-rose-200 hover:border-rose-500'
+        };
+      }
+      if (blk.colorGroup === 'five_notes') {
+        return {
+          selector: 'bg-indigo-50 border-indigo-200',
+          palette: 'bg-indigo-50 border-indigo-200 hover:border-indigo-500'
+        };
+      }
+
+      // Half-beat (0.5拍) in /2 meters -> super-light green (#ecfdf3)
+      if (Math.abs(blk.beats - 0.5) < 0.01) {
+        return {
+          selector: 'bg-[#ecfdf3] border-emerald-200',
+          palette: 'bg-[#ecfdf3] border-emerald-200 hover:border-emerald-500'
+        };
+      }
+
+      // 2-beat blocks -> soft blue
+      if (blk.beats >= 2) {
+        return {
+          selector: 'bg-sky-50 border-sky-200',
+          palette: 'bg-sky-50 border-sky-200 hover:border-sky-500'
+        };
+      }
+
+      // Standard 1-beat blocks -> clean white
+      return {
+        selector: 'bg-white border-slate-200',
+        palette: 'bg-white border-slate-200 hover:border-emerald-500'
+      };
+    }
+
+    function renderAll() {
+      const meter = getActiveMeter();
+
+      // 1. Render 4 SVG Measures
+      for (let m = 0; m < 4; m++) {
+        document.getElementById(`measure-slot-${m}`).innerHTML = renderMeasureSVG(m, state.measures, false);
+      }
+
+      // 2. Update Progress & Buttons
+      const usedM2 = getMeasureUsedBeats(2);
+      const usedM3 = getMeasureUsedBeats(3);
+      const totalUsed = usedM2 + usedM3;
+      const totalTarget = meter.beats * 2;
+      const remM2 = Math.max(0, meter.beats - usedM2);
+      const remM3 = Math.max(0, meter.beats - usedM3);
+      const fmt = (v) => Number.isInteger(v) ? v : v.toFixed(1);
+
+      const progBadge = document.getElementById('student-progress-badge');
+      const submitBtn = document.getElementById('btn-submit-exam');
+      const undoBtn = document.getElementById('btn-undo-student');
+      const clearBtn = document.getElementById('btn-clear-student');
+      const zoneBadge = document.getElementById('student-zone-badge');
+      const meterHint = document.getElementById('meter-instruction-hint');
+
+      if (meterHint) {
+        meterHint.textContent = isHalfBeatMeter(meter)
+          ? '二分1拍模式：以 0.5拍（半拍）為填入單位，每兩個半拍由同一虛線框包覆'
+          : '請聆聽全曲四小節，並聽寫填入第 3–4 小節';
+      }
+
+      if (state.isSubmitted) {
+        progBadge.textContent = `🔒 已送出作答（已填 ${fmt(totalUsed)} / ${totalTarget} 拍）`;
+        progBadge.className = 'text-xs font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full';
+        if (zoneBadge) zoneBadge.textContent = '聽寫作答區 · 第 3–4 小節（已鎖定批改）';
+        if (submitBtn) submitBtn.disabled = true;
+        if (undoBtn) undoBtn.disabled = true;
+        if (clearBtn) clearBtn.disabled = true;
+      } else {
+        if (zoneBadge) zoneBadge.textContent = '聽寫作答區 · 第 3–4 小節（拖曳或點擊下方積木填入）';
+        if (submitBtn) submitBtn.disabled = false;
+        if (Math.abs(totalUsed - totalTarget) < 0.01) {
+          progBadge.textContent = `✅ 已填滿兩小節（${totalTarget} / ${totalTarget} 拍）！可按「送出並公布答案」`;
+          progBadge.className = 'text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full';
+        } else {
+          progBadge.textContent = `已填 ${fmt(totalUsed)} / ${totalTarget} 拍（第3小節剩 ${fmt(remM2)} 拍 · 第4小節剩 ${fmt(remM3)} 拍）`;
+          progBadge.className = 'text-xs font-extrabold text-emerald-700';
+        }
+        if (undoBtn) undoBtn.disabled = state.studentHistory.length === 0;
+        if (clearBtn) clearBtn.disabled = (state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0);
+      }
+
+      renderStudentTieBar();
+      updateEasterEggLabels();
+      updateCollapsedSummary();
+      renderTopBlockSelector();
+      renderBottomAnswerPalette();
+    }
+
+    function renderStudentTieBar() {
+      const entries = getStudentTieableEntries();
+      const activeCount = entries.slice(0, -1).filter(e => e.note.tieToNext).length;
+      const badge = document.getElementById('student-tie-count-badge');
+      const hintEl = document.getElementById('student-tie-hint-text');
+      if (hintEl) {
+        hintEl.innerHTML = state.isSubmitted
+          ? '🔒 本題已批改鎖定；上方已標示每顆音符之實質發聲時值判定結果（✓ 正確 / ✗ 錯誤）'
+          : '🔗 連結線操作：點擊作答區（或第 2 小節末音）的<span class="text-amber-700 underline decoration-amber-400">音符符頭</span>即可建立／取消連向下一音的弧線（支持跨拍與跨小節）';
+      }
+      if (!badge) return;
+      badge.textContent = `目前作答區已設 ${activeCount} 條連結線`;
+      badge.className = activeCount > 0
+        ? 'text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-500 text-white'
+        : 'text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-white text-slate-500 border border-stone-200';
+    }
+
+    function renderTopBlockSelector() {
+      const body = document.getElementById('block-selector-body');
+      const pendingMeter = getPendingMeter();
+      const blocksInTab = RHYTHM_BLOCKS.filter(b => b.family === state.selectorTab);
+
+      const categories = [];
+      const catMap = new Map();
+      blocksInTab.forEach(b => {
+        if (!catMap.has(b.category)) {
+          catMap.set(b.category, []);
+          categories.push(b.category);
+        }
+        catMap.get(b.category).push(b);
+      });
+
+      const refMeter = (pendingMeter.family === state.selectorTab)
+        ? pendingMeter
+        : (state.selectorTab === 'simple_half' ? METERS['4/2'] : (state.selectorTab === 'compound' ? METERS['6/8'] : METERS['4/4']));
+
+      const eggLabelName = state.selectorTab === 'simple_half' ? '16分音符' : '32分音符';
+
+      let html = '';
+      categories.forEach(cat => {
+        const list = catMap.get(cat);
+        const isEggCategory = list.some(b => b.isEgg);
+        const isEggCatLocked = isEggCategory && state.eggMode === 'off';
+
+        html += `<div>`;
+        html += `<div class="text-xs font-extrabold text-slate-600 mb-1 flex flex-wrap items-center gap-1.5">
+          <span>▸ ${cat}</span>
+          ${isEggCatLocked ? `<span class="text-[11px] font-bold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">🔒 需先開啟右上角「考題彩蛋：${eggLabelName}」方可勾選</span>` : ''}
+        </div>`;
+
+        // 9-column grid layout, zero Chinese note descriptions inside cards
+        html += `<div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5">`;
+
+        list.forEach(blk => {
+          const isEggLocked = blk.isEgg && state.eggMode === 'off';
+          const isChecked = !isEggLocked && state.enabledBlockIds.has(blk.id);
+          const theme = getBlockColorTheme(blk);
+
+          const cardClasses = isEggLocked
+            ? 'bg-stone-100/80 border-stone-200 opacity-45 cursor-not-allowed'
+            : (isChecked
+                ? `${theme.selector} shadow-2xs cursor-pointer`
+                : 'bg-stone-50/60 border-stone-200 opacity-60 cursor-pointer');
+
+          const titleText = isEggLocked
+            ? `🔒 需先開啟右上角「考題彩蛋：${eggLabelName}」方可勾選`
+            : `${blk.beats}拍`;
+
+          html += `
+            <label class="relative rounded-xl border p-1.5 min-h-[58px] flex flex-col justify-between items-center select-none transition ${cardClasses}" title="${titleText}">
+              <div class="w-full flex items-center justify-between gap-0.5">
+                <span class="text-[9.5px] font-extrabold px-1.5 py-0.2 rounded bg-white/85 text-slate-700 border border-stone-200/80">${blk.beats}拍</span>
+                <span class="inline-flex items-center gap-0.5 text-[9.5px] font-extrabold ${isEggLocked ? 'text-slate-400' : (isChecked ? 'text-indigo-700' : 'text-slate-400')}">
+                  <input type="checkbox" ${isChecked ? 'checked' : ''} ${isEggLocked ? 'disabled' : ''} onchange="toggleBlockPool('${blk.id}', this.checked)" class="w-3 h-3 accent-indigo-600 ${isEggLocked ? 'cursor-not-allowed' : 'cursor-pointer'}" />
+                  <span>出題</span>
+                </span>
+              </div>
+              <div class="w-full flex items-center justify-center my-auto">
+                ${renderMiniBlockSVG(blk, refMeter)}
+              </div>
+            </label>
+          `;
+        });
+
+        html += `</div></div>`;
+      });
+
+      body.innerHTML = html;
+    }
+
+    function renderBottomAnswerPalette() {
+      const grid = document.getElementById('answer-palette-grid');
+      const subtitle = document.getElementById('answer-palette-subtitle');
+      const countBadge = document.getElementById('answer-palette-count-badge');
+      const meter = getActiveMeter();
+
+      const includeEgg = state.activeEggMode !== 'off';
+      const availableBlocks = RHYTHM_BLOCKS.filter(b =>
+        b.family === meter.family &&
+        state.enabledBlockIds.has(b.id) &&
+        b.beats <= meter.beats + 0.001 &&
+        (!b.isEgg || includeEgg)
+      );
+
+      subtitle.textContent = `僅顯示上方已勾選啟用之 ${state.activeMeterKey} 拍音型 · 拖曳至第 3–4 小節或點擊自動填入`;
+      countBadge.textContent = `可用積木：${availableBlocks.length} 個`;
+
+      if (availableBlocks.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full text-center py-3 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl">
+            ⚠️ 上方尚未勾選任何適用於 ${state.activeMeterKey} 拍的音型積木，請展開上方出題設定至少勾選一項。
+          </div>
+        `;
+        return;
+      }
+
+      // 9-column grid layout, zero Chinese note descriptions inside cards
+      let html = '';
+      availableBlocks.forEach(blk => {
+        const theme = getBlockColorTheme(blk);
+        const cardStyle = state.isSubmitted
+          ? 'opacity-45 pointer-events-none bg-stone-50 border-stone-200'
+          : theme.palette;
+
+        html += `
+          <div data-block-id="${blk.id}"
+               onpointerdown="beginPalettePointerDown(event, '${blk.id}')"
+               class="rhythm-tile relative rounded-xl border p-1.5 min-h-[58px] flex flex-col justify-between items-center cursor-grab ${cardStyle}"
+               title="${blk.beats}拍">
+            <div class="w-full flex items-center justify-between gap-0.5">
+              <span class="text-[9.5px] font-extrabold px-1.5 py-0.2 rounded bg-white/85 text-slate-700 border border-stone-200/80">${blk.beats}拍</span>
+              <span class="text-[9px] font-bold text-slate-400">＋</span>
+            </div>
+            <div class="w-full flex items-center justify-center my-auto">
+              ${renderMiniBlockSVG(blk, meter)}
+            </div>
+          </div>
+        `;
+      });
+
+      grid.innerHTML = html;
+    }
+
+    function updateEasterEggLabels() {
+      const pendingMeter = getPendingMeter();
+      const isHalf = pendingMeter.family === 'simple_half';
+      const titleEl = document.getElementById('egg-title-label');
+      const hintEl = document.getElementById('egg-hint-label');
+      if (titleEl) {
+        titleEl.textContent = isHalf ? '⚡ 考題彩蛋：16分音符' : '⚡ 考題彩蛋：32分音符';
+      }
+      if (hintEl) {
+        hintEl.textContent = isHalf
+          ? '開啟後方可勾選 0.5拍 16分音符積木（無 32分音符）'
+          : '開啟後方可勾選 32分音符彩蛋積木並同步至作答區';
+      }
+    }
+
+    function toggleTopPanel() {
+      state.topPanelCollapsed = !state.topPanelCollapsed;
+      const collapsedBar = document.getElementById('top-panel-collapsed-bar');
+      const expandedBody = document.getElementById('top-panel-expanded-body');
+      const btn = document.getElementById('btn-toggle-top-panel');
+
+      if (state.topPanelCollapsed) {
+        collapsedBar.classList.remove('hidden');
+        collapsedBar.classList.add('flex');
+        expandedBody.classList.add('hidden');
+        btn.innerHTML = '<span>展開出題設定 ▼</span>';
+        updateCollapsedSummary();
+      } else {
+        collapsedBar.classList.add('hidden');
+        collapsedBar.classList.remove('flex');
+        expandedBody.classList.remove('hidden');
+        btn.innerHTML = '<span>收合出題設定 ▲</span>';
+      }
+    }
+
+    function updateCollapsedSummary() {
+      const summaryEl = document.getElementById('collapsed-summary-text');
+      if (!summaryEl) return;
+      const pendingMeter = getPendingMeter();
+      const enabledCount = RHYTHM_BLOCKS.filter(b =>
+        b.family === pendingMeter.family &&
+        state.enabledBlockIds.has(b.id) &&
+        (!b.isEgg || state.eggMode !== 'off')
+      ).length;
+      const tieMap = { none: '無', low: '少（1-2）', medium: '中（3-4）' };
+      const eggMap = { off: '關閉', '0.25': '偶爾 25%', '0.55': '經常 55%', '1.0': '必考 100%' };
+      const eggName = pendingMeter.family === 'simple_half' ? '16分音符' : '32分音符';
+      summaryEl.textContent = `拍號：${state.pendingMeterKey} ｜ 速度：${audioState.bpm} BPM ｜ 連結線：${tieMap[state.tieMode]} ｜ ${eggName}：${eggMap[state.eggMode]} ｜ 已啟用積木：${enabledCount} 個`;
+    }
+
+    /* ==========================================================================
+       10. CONTROL HANDLERS
+       ========================================================================== */
+
+    function markPendingSettingsChanged() {
+      state.hasPendingChanges = true;
+      document.getElementById('pending-settings-notice').classList.remove('hidden');
+      updateCollapsedSummary();
+    }
+
+    function selectPendingMeter(meterKey) {
+      state.pendingMeterKey = meterKey;
+      const mObj = METERS[meterKey];
+
+      document.querySelectorAll('.meter-btn').forEach(btn => {
+        const key = btn.dataset.meter;
+        const btnMeter = METERS[key];
+        const isSelected = key === meterKey;
+        if (isSelected) {
+          btn.className = `meter-btn py-1.5 rounded-lg text-sm font-extrabold border shadow-2xs transition ${
+            btnMeter.family === 'compound'
+              ? 'compound border-teal-600 bg-teal-600 text-white'
+              : 'border-indigo-600 bg-indigo-600 text-white'
+          }`;
+        } else {
+          btn.className = `meter-btn ${btnMeter.family === 'compound' ? 'compound' : ''} py-1.5 rounded-lg text-sm font-extrabold border border-stone-200 bg-white hover:border-indigo-500 transition`;
+        }
+      });
+
+      switchSelectorTab(mObj.family, false);
+      updateEasterEggLabels();
+      markPendingSettingsChanged();
+      renderTopBlockSelector();
+    }
+
+    function switchSelectorTab(tabFamily, shouldRender = true) {
+      state.selectorTab = tabFamily;
+      ['simple_half', 'simple_quarter', 'compound'].forEach(key => {
+        const tabEl = document.getElementById(`tab-${key}`);
+        if (!tabEl) return;
+        if (key === tabFamily) {
+          tabEl.className = `px-2.5 py-1 rounded-lg text-xs font-extrabold transition shadow-2xs text-white ${
+            key === 'compound' ? 'bg-teal-600' : 'bg-indigo-600'
+          }`;
+        } else {
+          tabEl.className = 'px-2.5 py-1 rounded-lg text-xs font-extrabold transition text-slate-600 hover:text-slate-900';
+        }
+      });
+
+      if (shouldRender) renderTopBlockSelector();
+    }
+
+    function toggleBlockPool(blockId, checked) {
+      const blk = RHYTHM_BLOCKS.find(b => b.id === blockId);
+      if (blk && blk.isEgg && state.eggMode === 'off') {
+        renderTopBlockSelector();
+        return;
+      }
+      if (checked) state.enabledBlockIds.add(blockId);
+      else state.enabledBlockIds.delete(blockId);
+      markPendingSettingsChanged();
+      renderTopBlockSelector();
+      renderBottomAnswerPalette();
+    }
+
+    function bulkSetBlocks(mode) {
+      const blocksInTab = RHYTHM_BLOCKS.filter(b => b.family === state.selectorTab);
+      blocksInTab.forEach(b => {
+        // Locked Easter egg blocks are skipped when eggMode === 'off'
+        if (b.isEgg && state.eggMode === 'off') {
+          state.enabledBlockIds.delete(b.id);
+          return;
+        }
+        if (mode === 'all') {
+          state.enabledBlockIds.add(b.id);
+        } else if (mode === 'default') {
+          if (b.defaultOn) state.enabledBlockIds.add(b.id);
+          else state.enabledBlockIds.delete(b.id);
+        } else if (mode === 'basic1beat') {
+          if (b.basic1Beat) state.enabledBlockIds.add(b.id);
+          else state.enabledBlockIds.delete(b.id);
+        }
+      });
+      markPendingSettingsChanged();
+      renderTopBlockSelector();
+      renderBottomAnswerPalette();
+      showToast(mode === 'all' ? '已全選本分類可用音型' : (mode === 'default' ? '已恢復常用完整組合' : '已切換為僅選基礎節奏'));
+    }
+
+    function setTieMode(mode) {
+      state.tieMode = mode;
+      const labels = { none: '無', low: '少（1-2）', medium: '中（3-4）' };
+      document.getElementById('tie-mode-val').textContent = labels[mode];
+
+      ['none', 'low', 'medium'].forEach(k => {
+        const btn = document.getElementById(`tie-mode-btn-${k}`);
+        if (!btn) return;
+        btn.className = k === mode
+          ? 'py-1.5 rounded-lg text-xs font-extrabold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition'
+          : 'py-1.5 rounded-lg text-xs font-extrabold border border-stone-200 bg-white text-slate-700 hover:border-indigo-500 transition';
+      });
+      markPendingSettingsChanged();
+    }
+
+    function updateEggSetting(val) {
+      state.eggMode = val;
+      state.activeEggMode = val;
+
+      const badge = document.getElementById('egg-badge');
+      const map = { off: '關閉', '0.25': '偶爾 25%', '0.55': '經常 55%', '1.0': '必考 100%' };
+      badge.textContent = map[val] || '關閉';
+      badge.className = val === 'off'
+        ? 'text-[10.5px] font-extrabold px-1.5 py-0.5 rounded bg-stone-200 text-slate-600'
+        : 'text-[10.5px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500 text-white';
+
+      // When off -> lock & uncheck all Easter egg blocks; when enabled -> unlock & check them
+      RHYTHM_BLOCKS.forEach(b => {
+        if (b.isEgg) {
+          if (val === 'off') state.enabledBlockIds.delete(b.id);
+          else state.enabledBlockIds.add(b.id);
+        }
+      });
+
+      markPendingSettingsChanged();
+      renderTopBlockSelector();
+      renderBottomAnswerPalette();
+    }
+
+    function setStaffStyle(style) {
+      state.staffStyle = style;
+      const sBtn = document.getElementById('staff-single-btn');
+      const fBtn = document.getElementById('staff-five-btn');
+      if (style === 'single') {
+        sBtn.className = 'px-2 py-0.5 rounded font-bold bg-white text-slate-800 shadow-2xs';
+        fBtn.className = 'px-2 py-0.5 rounded font-semibold text-slate-500 hover:text-slate-800';
+      } else {
+        sBtn.className = 'px-2 py-0.5 rounded font-semibold text-slate-500 hover:text-slate-800';
+        fBtn.className = 'px-2 py-0.5 rounded font-bold bg-white text-slate-800 shadow-2xs';
+      }
+      renderAll();
+      if (state.isSubmitted) {
+        document.getElementById('ans-measure-slot-2').innerHTML = renderMeasureSVG(2, state.solutionMeasures, true);
+        document.getElementById('ans-measure-slot-3').innerHTML = renderMeasureSVG(3, state.solutionMeasures, true);
+      }
+    }
+
+    function updateBpm(val) {
+      const clamped = Math.max(50, Math.min(140, parseInt(val, 10) || 72));
+      audioState.bpm = clamped;
+      document.getElementById('bpm-slider').value = String(clamped);
+      document.getElementById('bpm-val').textContent = String(clamped);
+      updateCollapsedSummary();
+    }
+
+    function stepBpm(delta) {
+      updateBpm(audioState.bpm + delta);
+    }
+
+    function selectTimbre(timbreKey) {
+      audioState.timbre = timbreKey;
+      ['woodblock', 'piano', 'snare'].forEach(key => {
+        const btn = document.getElementById(`timbre-btn-${key}`);
+        if (!btn) return;
+        btn.className = key === timbreKey
+          ? 'px-2.5 py-1 rounded-lg text-xs font-extrabold border border-indigo-600 bg-indigo-600 text-white shadow-2xs transition'
+          : 'px-2.5 py-1 rounded-lg text-xs font-extrabold border border-stone-300 bg-white text-slate-700 hover:border-indigo-500 transition';
+      });
+    }
+
+    function toggleMetronome() {
+      audioState.metronomeOn = !audioState.metronomeOn;
+      const btn = document.getElementById('btn-metronome');
+      btn.textContent = `⏱️ 節拍器：${audioState.metronomeOn ? '開' : '關'}`;
+      btn.className = audioState.metronomeOn
+        ? 'px-3 py-1 rounded-lg text-xs font-extrabold border border-indigo-400 bg-indigo-50 text-indigo-800 transition'
+        : 'px-3 py-1 rounded-lg text-xs font-extrabold border border-stone-300 bg-white text-slate-600 hover:border-indigo-400 transition';
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = 'bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold shadow-xl border border-slate-700 transition-opacity duration-300';
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+      }, 2400);
+    }
+
+    /* ==========================================================================
+       11. WEB AUDIO API SCHEDULER (NO COUNT-IN, CRISP WOODBLOCK & STEADY PIANO)
+       ========================================================================== */
+
+    function createNoiseBuffer(ctx) {
+      const length = Math.floor(ctx.sampleRate * 0.5);
+      const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      return buffer;
+    }
+
+    function ensureAudioContext() {
+      if (!audioState.ctx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioState.ctx = new AudioCtx();
+      }
+      if (audioState.ctx.state === 'suspended') {
+        audioState.ctx.resume();
+      }
+      if (!audioState.noiseBuffer) {
+        audioState.noiseBuffer = createNoiseBuffer(audioState.ctx);
+      }
+    }
+
+    function buildPlaybackTimeline(mode) {
+      const meter = getActiveMeter();
+      const isExamSource = (mode === 'exam_all' || mode === 'exam_34');
+      const sourceMeasures = isExamSource ? state.solutionMeasures : state.measures;
+      const startMeasure = (mode === 'exam_34' || mode === 'student_only') ? 2 : 0;
+      const endMeasure = 3;
+
+      const events = [];
+      let beatOffset = 0;
+      const rawNotes = [];
+
+      for (let mIdx = startMeasure; mIdx <= endMeasure; mIdx++) {
+        const mStartBeat = beatOffset;
+
+        for (let b = 0; b < meter.beats; b++) {
+          events.push({
+            type: 'metronome',
+            isDownbeat: b === 0,
+            beatTime: mStartBeat + b
+          });
+        }
+
+        let localBeat = 0;
+        sourceMeasures[mIdx].blocks.forEach((blk, bIdx) => {
+          blk.notes.forEach((n, nIdx) => {
+            rawNotes.push({
+              beatTime: mStartBeat + localBeat,
+              durBeats: n.dur,
+              isRest: !!n.isRest,
+              tieToNext: !n.isRest && !!n.tieToNext,
+              domId: (isExamSource && state.isSubmitted && mIdx >= 2)
+                ? `sol-note-m${mIdx}-b${bIdx}-n${nIdx}`
+                : `note-m${mIdx}-b${bIdx}-n${nIdx}`
+            });
+            localBeat += n.dur;
+          });
+        });
+
+        beatOffset += meter.beats;
+      }
+
+      for (let i = 0; i < rawNotes.length; i++) {
+        const rn = rawNotes[i];
+        if (rn.isRest) {
+          events.push({
+            type: 'note',
+            beatTime: rn.beatTime,
+            durBeats: rn.durBeats,
+            soundingBeats: 0,
+            isRest: true,
+            isTiedFromPrev: false,
+            domId: rn.domId
+          });
+          continue;
+        }
+
+        const isTiedFromPrev = (i > 0 && !rawNotes[i - 1].isRest && rawNotes[i - 1].tieToNext);
+        let soundingBeats = rn.durBeats;
+        if (!isTiedFromPrev) {
+          let look = i;
+          while (rawNotes[look].tieToNext && look + 1 < rawNotes.length && !rawNotes[look + 1].isRest) {
+            look++;
+            soundingBeats += rawNotes[look].durBeats;
+          }
+        }
+        events.push({
+          type: 'note',
+          beatTime: rn.beatTime,
+          durBeats: rn.durBeats,
+          soundingBeats,
+          isRest: false,
+          isTiedFromPrev,
+          domId: rn.domId
+        });
+      }
+
+      events.sort((a, b) => a.beatTime - b.beatTime);
+      return { events, totalBeats: beatOffset };
+    }
+
+    function startPlayback(mode) {
+      if ((mode === 'student_only' || mode === 'student_all') &&
+          state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0) {
+        showToast('⚠️ 第 3–4 小節目前為空，請先填入積木再試聽');
+        return;
+      }
+
+      stopPlayback();
+      ensureAudioContext();
+
+      state.playCount += 1;
+      document.getElementById('play-count-val').textContent = String(state.playCount);
+
+      audioState.playMode = mode;
+      const timeline = buildPlaybackTimeline(mode);
+      audioState.scheduleEvents = timeline.events;
+      audioState.totalBeats = timeline.totalBeats;
+      audioState.nextEventIdx = 0;
+      audioState.isPlaying = true;
+      // Start immediately on Bar 1 Beat 1 (zero count-in)
+      audioState.startTime = audioState.ctx.currentTime + 0.04;
+
+      document.getElementById('btn-stop').disabled = false;
+
+      audioState.timerId = setInterval(schedulerTick, 25);
+      audioState.rafId = requestAnimationFrame(visualSyncLoop);
+    }
+
+    function stopPlayback() {
+      audioState.isPlaying = false;
+      if (audioState.timerId) {
+        clearInterval(audioState.timerId);
+        audioState.timerId = null;
+      }
+      if (audioState.rafId) {
+        cancelAnimationFrame(audioState.rafId);
+        audioState.rafId = null;
+      }
+      document.getElementById('btn-stop').disabled = true;
+
+      document.querySelectorAll('.note-group.active-note').forEach(el => el.classList.remove('active-note'));
+      for (let m = 0; m < 4; m++) {
+        const cur = document.getElementById(`cursor-m${m}`);
+        if (cur) cur.setAttribute('opacity', '0');
+        const solCur = document.getElementById(`sol-cursor-m${m}`);
+        if (solCur) solCur.setAttribute('opacity', '0');
+      }
+    }
+
+    function schedulerTick() {
+      if (!audioState.isPlaying) return;
+      const ctx = audioState.ctx;
+      const secPerBeat = getSecondsPerBeat();
+      const lookaheadSec = 0.1;
+
+      while (audioState.nextEventIdx < audioState.scheduleEvents.length) {
+        const ev = audioState.scheduleEvents[audioState.nextEventIdx];
+        const evTime = audioState.startTime + ev.beatTime * secPerBeat;
+        if (evTime > ctx.currentTime + lookaheadSec) break;
+
+        if (ev.type === 'metronome') {
+          if (audioState.metronomeOn) {
+            triggerMetronomeOnContext(ctx, evTime, ev.isDownbeat);
+          }
+        } else if (ev.type === 'note' && !ev.isRest && !ev.isTiedFromPrev) {
+          triggerRhythmOnContext(ctx, audioState.noiseBuffer, evTime, ev.soundingBeats * secPerBeat, audioState.timbre, audioState.volRhythm);
+        }
+        audioState.nextEventIdx++;
+      }
+
+      const endTime = audioState.startTime + audioState.totalBeats * secPerBeat;
+      if (ctx.currentTime >= endTime) {
+        stopPlayback();
+      }
+    }
+
+    function triggerMetronomeOnContext(ctx, time, isDownbeat) {
+      const vol = isDownbeat ? 0.65 : 0.4;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(isDownbeat ? 1320 : 880, time);
+      osc.frequency.exponentialRampToValueAtTime(isDownbeat ? 660 : 440, time + 0.028);
+
+      gain.gain.setValueAtTime(vol * 0.45, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.036);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.042);
+    }
+
+    function triggerRhythmOnContext(ctx, noiseBuffer, time, durationSec, timbre, vol) {
+      if (vol <= 0.001) return;
+
+      if (timbre === 'woodblock') {
+        // Crisp hollow knock (820Hz + 1235Hz sine/triangle oscillators with rapid exponential decay)
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const bandpass = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+
+        bandpass.type = 'bandpass';
+        bandpass.frequency.setValueAtTime(1020, time);
+        bandpass.Q.setValueAtTime(2.3, time);
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(820, time);
+        osc1.frequency.exponentialRampToValueAtTime(755, time + 0.048);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(1235, time);
+        osc2.frequency.exponentialRampToValueAtTime(1140, time + 0.042);
+
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.linearRampToValueAtTime(vol * 0.85, time + 0.003);
+        gain.gain.exponentialRampToValueAtTime(0.0008, time + 0.056);
+
+        osc1.connect(bandpass);
+        osc2.connect(bandpass);
+        bandpass.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(time);
+        osc2.start(time);
+        osc1.stop(time + 0.064);
+        osc2.stop(time + 0.064);
+
+      } else if (timbre === 'piano') {
+        // Steady string vibration at E4 (329.63Hz) with warm overtones and clean damper release
+        const fundamental = 329.63; // E4
+        const holdEnd = time + Math.max(durationSec * 0.92, 0.08);
+        const releaseEnd = holdEnd + 0.065;
+
+        const partials = [
+          { mult: 1, amp: 0.46, decayRate: 1.55 },
+          { mult: 2, amp: 0.22, decayRate: 2.25 },
+          { mult: 3, amp: 0.10, decayRate: 3.05 },
+          { mult: 4, amp: 0.04, decayRate: 4.10 }
+        ];
+
+        partials.forEach(p => {
+          const osc = ctx.createOscillator();
+          const pGain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(fundamental * p.mult, time);
+
+          const peak = vol * p.amp;
+          const sustainLevel = Math.max(0.001, peak * Math.exp(-p.decayRate * (holdEnd - time)));
+
+          pGain.gain.setValueAtTime(0.0001, time);
+          pGain.gain.linearRampToValueAtTime(peak, time + 0.007);
+          pGain.gain.exponentialRampToValueAtTime(sustainLevel, holdEnd);
+          pGain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
+
+          osc.connect(pGain);
+          pGain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(releaseEnd + 0.01);
+        });
+
+      } else if (timbre === 'snare') {
+        // Crisp Snare Drum
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.setValueAtTime(1150, time);
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(vol * 0.62, time);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.13);
+
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(time);
+        noise.stop(time + 0.14);
+
+        const bodyOsc = ctx.createOscillator();
+        const bodyGain = ctx.createGain();
+        bodyOsc.type = 'triangle';
+        bodyOsc.frequency.setValueAtTime(195, time);
+        bodyOsc.frequency.exponentialRampToValueAtTime(105, time + 0.065);
+
+        bodyGain.gain.setValueAtTime(vol * 0.52, time);
+        bodyGain.gain.exponentialRampToValueAtTime(0.001, time + 0.08);
+
+        bodyOsc.connect(bodyGain);
+        bodyGain.connect(ctx.destination);
+        bodyOsc.start(time);
+        bodyOsc.stop(time + 0.085);
+      }
+    }
+
+    function visualSyncLoop() {
+      if (!audioState.isPlaying) return;
+
+      const ctx = audioState.ctx;
+      const meter = getActiveMeter();
+      const secPerBeat = getSecondsPerBeat();
+      const elapsedBeats = (ctx.currentTime - audioState.startTime) / secPerBeat;
+
+      for (let m = 0; m < 4; m++) {
+        const cur = document.getElementById(`cursor-m${m}`);
+        if (cur) cur.setAttribute('opacity', '0');
+        const solCur = document.getElementById(`sol-cursor-m${m}`);
+        if (solCur) solCur.setAttribute('opacity', '0');
+      }
+
+      if (elapsedBeats >= 0) {
+        const startMeasure = (audioState.playMode === 'exam_34' || audioState.playMode === 'student_only') ? 2 : 0;
+        const relMeasure = Math.floor(elapsedBeats / meter.beats);
+        const activeMeasure = startMeasure + relMeasure;
+        const beatInMeasure = elapsedBeats - relMeasure * meter.beats;
+
+        if (activeMeasure >= 0 && activeMeasure <= 3) {
+          const showTimeSig = (activeMeasure === 0 || activeMeasure === 2);
+          const leftPad = showTimeSig ? 56 : 20;
+          const contentW = 460 - leftPad - 18;
+          const x = leftPad + (beatInMeasure / meter.beats) * contentW;
+
+          // When playing exam_all or exam_34 before submission, keep cursor on Bars 1-2 only (don't spoil empty Bars 3-4 position visually)
+          const isExamMode = (audioState.playMode === 'exam_all' || audioState.playMode === 'exam_34');
+          if (!isExamMode || activeMeasure < 2 || state.isSubmitted) {
+            if (isExamMode && state.isSubmitted && activeMeasure >= 2) {
+              const solCur = document.getElementById(`sol-cursor-m${activeMeasure}`);
+              if (solCur) {
+                solCur.setAttribute('x1', x.toFixed(1));
+                solCur.setAttribute('x2', x.toFixed(1));
+                solCur.setAttribute('opacity', '0.92');
+              }
+            } else {
+              const cur = document.getElementById(`cursor-m${activeMeasure}`);
+              if (cur) {
+                cur.setAttribute('x1', x.toFixed(1));
+                cur.setAttribute('x2', x.toFixed(1));
+                cur.setAttribute('opacity', '0.92');
+              }
+            }
+          }
+        }
+      }
+
+      let activeDomId = null;
+      for (let i = 0; i < audioState.scheduleEvents.length; i++) {
+        const ev = audioState.scheduleEvents[i];
+        if (ev.type === 'note' && !ev.isRest && elapsedBeats >= ev.beatTime && elapsedBeats < ev.beatTime + ev.durBeats) {
+          activeDomId = ev.domId;
+          break;
+        }
+      }
+
+      document.querySelectorAll('.note-group.active-note').forEach(el => {
+        if (el.id !== activeDomId) el.classList.remove('active-note');
+      });
+      if (activeDomId) {
+        const target = document.getElementById(activeDomId);
+        if (target && !target.classList.contains('active-note')) {
+          target.classList.add('active-note');
+        }
+      }
+
+      audioState.rafId = requestAnimationFrame(visualSyncLoop);
+    }
+
+    /* ==========================================================================
+       12. INITIALIZATION & KEYBOARD SHORTCUTS
+       ========================================================================== */
+
+    window.addEventListener('DOMContentLoaded', () => {
+      generateNewPrompt();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (!state.isSubmitted && state.studentHistory.length > 0) {
+          e.preventDefault();
+          undoStudentBlock();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
