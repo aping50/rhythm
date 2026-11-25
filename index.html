@@ -358,7 +358,7 @@
             </span>
           </div>
           <div class="flex items-center gap-2">
-            <span id="meter-instruction-hint" class="text-xs font-semibold text-slate-500">請聆聽全曲四小節，並聽寫填入第 3–4 小節</span>
+            <span id="meter-instruction-hint" class="text-xs font-semibold text-slate-500">請聆聽全曲四小節，聽不出來的拍點可留白，隨時可送出批改</span>
             <div class="inline-flex bg-stone-200/70 p-0.5 rounded-lg text-[11px]">
               <button id="staff-single-btn" onclick="setStaffStyle('single')" class="px-2 py-0.5 rounded font-bold bg-white text-slate-800 shadow-2xs">單線譜</button>
               <button id="staff-five-btn" onclick="setStaffStyle('five')" class="px-2 py-0.5 rounded font-semibold text-slate-500 hover:text-slate-800">五線譜</button>
@@ -377,7 +377,7 @@
         <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
           <div class="flex flex-wrap items-center gap-2">
             <span id="student-zone-badge" class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              聽寫作答區 · 第 3–4 小節（拖曳或點擊下方積木填入）
+              聽寫作答區 · 第 3–4 小節（精準落點放入・點擊 × 僅清除該拍點不前移・留白可送出）
             </span>
             <span id="student-progress-badge" class="text-xs font-extrabold text-emerald-700">
               已填 0 / 8 拍（第3小節剩 4 拍 · 第4小節剩 4 拍）
@@ -386,7 +386,7 @@
 
           <div class="flex flex-wrap items-center gap-1.5">
             <button id="btn-undo-student" onclick="undoStudentBlock()" disabled class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white hover:bg-stone-100 disabled:opacity-40 text-slate-700 border border-stone-300 transition">
-              ↩ 復原一格
+              ↩ 復原一步
             </button>
             <button id="btn-clear-student" onclick="clearStudentMeasures()" disabled class="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-50 hover:bg-rose-100 disabled:opacity-40 text-rose-700 border border-rose-200 transition">
               🗑️ 清空作答
@@ -419,7 +419,7 @@
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
               <h3 class="text-xs sm:text-sm font-extrabold text-emerald-950">作答專用積木列</h3>
               <span id="answer-palette-subtitle" class="text-[11px] font-semibold text-emerald-800">
-                僅顯示上方已勾選啟用之 4/4 拍音型 · 拖曳至第 3–4 小節或點擊自動填入
+                僅顯示上方已勾選啟用之 4/4 拍音型 · 拖曳至指定拍點或點擊自動填入
               </span>
             </div>
             <span id="answer-palette-count-badge" class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-white text-emerald-800 border border-emerald-200">
@@ -492,7 +492,6 @@
       '12/8': { num: 12, den: 8, family: 'compound',      beats: 4, slotUnit: 1.0 }
     };
 
-    // Helper to define notes cleanly (supports sounding notes and rests)
     function makeNotes(specList, tuplet = null, isEgg = false) {
       return specList.map(item => {
         if (typeof item === 'number') {
@@ -504,362 +503,80 @@
 
     const RHYTHM_BLOCKS = [
       // ==================== A. SIMPLE METERS: QUARTER = 1 BEAT (2/4, 3/4, 4/4) ====================
-      // 17 non-duplicate core blocks (13 one-beat white + 4 two-beat soft blue)
-      {
-        id: 'sq_q', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([1])
-      },
-      {
-        id: 'sq_2e', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([0.5, 0.5])
-      },
-      {
-        id: 'sq_4s', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([0.25, 0.25, 0.25, 0.25])
-      },
-      {
-        id: 'sq_e_2s', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.5, 0.25, 0.25])
-      },
-      {
-        id: 'sq_2s_e', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.25, 0.25, 0.5])
-      },
-      {
-        id: 'sq_sync16', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.25, 0.5, 0.25])
-      },
-      {
-        id: 'sq_dote_s', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.75, 0.25])
-      },
-      {
-        id: 'sq_s_dote', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.25, 0.75])
-      },
-      {
-        id: 'sq_trip3', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([1/3, 1/3, 1/3], 3)
-      },
-      {
-        id: 'sq_trip_q_e', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([2/3, 1/3], 3)
-      },
-      {
-        id: 'sq_trip_e_q', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([1/3, 2/3], 3)
-      },
-      {
-        id: 'sq_qrest', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([{ dur: 1, isRest: true }])
-      },
-      {
-        id: 'sq_erest_e', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([{ dur: 0.5, isRest: true }, 0.5])
-      },
-      // 4 two-beat soft-blue blocks
-      {
-        id: 'sq_half', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([2])
-      },
-      {
-        id: 'sq_dotq_e', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([1.5, 0.5])
-      },
-      {
-        id: 'sq_e_dotq', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([0.5, 1.5])
-      },
-      {
-        id: 'sq_sync2', family: 'simple_quarter', category: '常規音型（17種）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([0.5, 1.0, 0.5])
-      },
+      { id: 'sq_q', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([1]) },
+      { id: 'sq_2e', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([0.5, 0.5]) },
+      { id: 'sq_4s', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([0.25, 0.25, 0.25, 0.25]) },
+      { id: 'sq_e_2s', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.5, 0.25, 0.25]) },
+      { id: 'sq_2s_e', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.25, 0.25, 0.5]) },
+      { id: 'sq_sync16', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.25, 0.5, 0.25]) },
+      { id: 'sq_dote_s', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.75, 0.25]) },
+      { id: 'sq_s_dote', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.25, 0.75]) },
+      { id: 'sq_trip3', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([1/3, 1/3, 1/3], 3) },
+      { id: 'sq_trip_q_e', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([2/3, 1/3], 3) },
+      { id: 'sq_trip_e_q', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([1/3, 2/3], 3) },
+      { id: 'sq_qrest', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([{ dur: 1, isRest: true }]) },
+      { id: 'sq_erest_e', family: 'simple_quarter', category: '常規音型（17種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([{ dur: 0.5, isRest: true }, 0.5]) },
+      { id: 'sq_half', family: 'simple_quarter', category: '常規音型（17種）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([2]) },
+      { id: 'sq_dotq_e', family: 'simple_quarter', category: '常規音型（17種）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([1.5, 0.5]) },
+      { id: 'sq_e_dotq', family: 'simple_quarter', category: '常規音型（17種）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([0.5, 1.5]) },
+      { id: 'sq_sync2', family: 'simple_quarter', category: '常規音型（17種）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([0.5, 1.0, 0.5]) },
 
-      // 5 32nd-note Easter egg blocks for 2/4, 3/4, 4/4 (1 beat each, white)
-      {
-        id: 'sq32_8x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125], null, true)
-      },
-      {
-        id: 'sq32_e_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.5, 0.125, 0.125, 0.125, 0.125], null, true)
-      },
-      {
-        id: 'sq32_4x32_e', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.5], null, true)
-      },
-      {
-        id: 'sq32_2x16_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.25, 0.25, 0.125, 0.125, 0.125, 0.125], null, true)
-      },
-      {
-        id: 'sq32_4x32_2x16', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.25, 0.25], null, true)
-      },
+      // 5 32nd-note Easter egg blocks for 2/4, 3/4, 4/4
+      { id: 'sq32_8x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125], null, true) },
+      { id: 'sq32_e_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.5, 0.125, 0.125, 0.125, 0.125], null, true) },
+      { id: 'sq32_4x32_e', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.5], null, true) },
+      { id: 'sq32_2x16_4x32', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.25, 0.25, 0.125, 0.125, 0.125, 0.125], null, true) },
+      { id: 'sq32_4x32_2x16', family: 'simple_quarter', category: '32分音符彩蛋積木（5種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.125, 0.125, 0.125, 0.25, 0.25], null, true) },
 
       // ==================== B. SIMPLE METERS: HALF-NOTE = 1 BEAT (2/2, 3/2, 4/2) ====================
-      // Half-beat (0.5拍) blocks -> super-light green (#ecfdf3)
-      {
-        id: 'sh_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([0.5])
-      },
-      {
-        id: 'sh_2e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([0.25, 0.25])
-      },
-      {
-        id: 'sh_qrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([{ dur: 0.5, isRest: true }])
-      },
-      {
-        id: 'sh_trip3', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([1/6, 1/6, 1/6], 3)
-      },
-      {
-        id: 'sh_trip_q_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([1/3, 1/6], 3)
-      },
-      {
-        id: 'sh_trip_e_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([1/6, 1/3], 3)
-      },
+      { id: 'sh_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([0.5]) },
+      { id: 'sh_2e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([0.25, 0.25]) },
+      { id: 'sh_qrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([{ dur: 0.5, isRest: true }]) },
+      { id: 'sh_trip3', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([1/6, 1/6, 1/6], 3) },
+      { id: 'sh_trip_q_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([1/3, 1/6], 3) },
+      { id: 'sh_trip_e_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 0.5, tuplet: 3, defaultOn: true, basic1Beat: false, notes: makeNotes([1/6, 1/3], 3) },
+      { id: 'sh_half', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([1]) },
+      { id: 'sh_dotq_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.75, 0.25]) },
+      { id: 'sh_e_dotq', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.25, 0.75]) },
+      { id: 'sh_sync1', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, notes: makeNotes([0.25, 0.5, 0.25]) },
+      { id: 'sh_hrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([{ dur: 1, isRest: true }]) },
+      { id: 'sh_whole', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([2]) },
+      { id: 'sh_doth_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([1.5, 0.5]) },
+      { id: 'sh_q_doth', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([0.5, 1.5]) },
+      { id: 'sh_sync2', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）', beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true, notes: makeNotes([0.5, 1.0, 0.5]) },
 
-      // 1-beat (1拍) blocks -> white
-      {
-        id: 'sh_half', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([1])
-      },
-      {
-        id: 'sh_dotq_e', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.75, 0.25])
-      },
-      {
-        id: 'sh_e_dotq', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.25, 0.75])
-      },
-      {
-        id: 'sh_sync1', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false,
-        notes: makeNotes([0.25, 0.5, 0.25])
-      },
-      {
-        id: 'sh_hrest', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([{ dur: 1, isRest: true }])
-      },
-
-      // 2-beat (2拍) blocks -> soft blue
-      {
-        id: 'sh_whole', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([2])
-      },
-      {
-        id: 'sh_doth_q', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([1.5, 0.5])
-      },
-      {
-        id: 'sh_q_doth', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([0.5, 1.5])
-      },
-      {
-        id: 'sh_sync2', family: 'simple_half', category: '常規音型（半拍・1拍・2拍）',
-        beats: 2, tuplet: null, defaultOn: true, basic1Beat: false, isMultiBeat: true,
-        notes: makeNotes([0.5, 1.0, 0.5])
-      },
-
-      // 6 16th-note Easter egg blocks for 2/2, 3/2, 4/2 (ONLY 0.5拍 half-beat, super-light green, NO 32nds, NO sextuplets)
-      {
-        id: 'sh16_4s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.125, 0.125, 0.125], null, true)
-      },
-      {
-        id: 'sh16_e_2s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.25, 0.125, 0.125], null, true)
-      },
-      {
-        id: 'sh16_2s_e', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.125, 0.25], null, true)
-      },
-      {
-        id: 'sh16_sync', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.25, 0.125], null, true)
-      },
-      {
-        id: 'sh16_dote_s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.375, 0.125], null, true)
-      },
-      {
-        id: 'sh16_s_dote', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）',
-        beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.125, 0.375], null, true)
-      },
+      // 6 16th-note Easter egg blocks for 2/2, 3/2, 4/2
+      { id: 'sh16_4s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.125, 0.125, 0.125], null, true) },
+      { id: 'sh16_e_2s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.25, 0.125, 0.125], null, true) },
+      { id: 'sh16_2s_e', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.125, 0.25], null, true) },
+      { id: 'sh16_sync', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.25, 0.125], null, true) },
+      { id: 'sh16_dote_s', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.375, 0.125], null, true) },
+      { id: 'sh16_s_dote', family: 'simple_half', category: '16分音符彩蛋積木（0.5拍・6種）', beats: 0.5, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.125, 0.375], null, true) },
 
       // ==================== C. COMPOUND METERS: DOTTED-QUARTER = 1 BIG BEAT (6/8, 9/8, 12/8) ====================
-      // 1. Basic 1-beat blocks (white)
-      {
-        id: 'c_dotq', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([1])
-      },
-      {
-        id: 'c_3e', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([1/3, 1/3, 1/3])
-      },
-      {
-        id: 'c_q_e', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([2/3, 1/3])
-      },
-      {
-        id: 'c_e_q', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([1/3, 2/3])
-      },
-      {
-        id: 'c_dotqrest', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: true,
-        notes: makeNotes([{ dur: 1, isRest: true }])
-      },
-
-      // 2. 附點+16+8 group (unified teal)
-      {
-        id: 'c_dote_s_e', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
-        notes: makeNotes([0.5, 1/6, 1/3])
-      },
-      {
-        id: 'c_e_dote_s', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
-        notes: makeNotes([1/3, 0.5, 1/6])
-      },
-      {
-        id: 'c_e_s_dote', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8',
-        notes: makeNotes([1/3, 1/6, 0.5])
-      },
-
-      // 3. 雙十六+兩八 group (unified purple)
-      {
-        id: 'c_2s_2e', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
-        notes: makeNotes([1/6, 1/6, 1/3, 1/3])
-      },
-      {
-        id: 'c_e_2s_e', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
-        notes: makeNotes([1/3, 1/6, 1/6, 1/3])
-      },
-      {
-        id: 'c_2e_2s', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8',
-        notes: makeNotes([1/3, 1/3, 1/6, 1/6])
-      },
-
-      // 4. 附點八+三16 group (unified rose)
-      {
-        id: 'c_dote_3s_p1', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
-        notes: makeNotes([0.5, 1/6, 1/6, 1/6])
-      },
-      {
-        id: 'c_dote_3s_p2', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
-        notes: makeNotes([1/6, 0.5, 1/6, 1/6])
-      },
-      {
-        id: 'c_dote_3s_p3', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
-        notes: makeNotes([1/6, 1/6, 0.5, 1/6])
-      },
-      {
-        id: 'c_dote_3s_p4', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16',
-        notes: makeNotes([1/6, 1/6, 1/6, 0.5])
-      },
-
-      // 5. 五個音一組: 8 + four 16ths in all 5 positions (unified indigo)
-      {
-        id: 'c_5n_p1', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
-        notes: makeNotes([1/3, 1/6, 1/6, 1/6, 1/6])
-      },
-      {
-        id: 'c_5n_p2', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
-        notes: makeNotes([1/6, 1/3, 1/6, 1/6, 1/6])
-      },
-      {
-        id: 'c_5n_p3', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
-        notes: makeNotes([1/6, 1/6, 1/3, 1/6, 1/6])
-      },
-      {
-        id: 'c_5n_p4', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
-        notes: makeNotes([1/6, 1/6, 1/6, 1/3, 1/6])
-      },
-      {
-        id: 'c_5n_p5', family: 'compound', category: '常規一大拍音型（20種）',
-        beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes',
-        notes: makeNotes([1/6, 1/6, 1/6, 1/6, 1/3])
-      },
-
-      // Compound 32nd-note Easter egg blocks (3 blocks, 1 big beat each, white)
-      {
-        id: 'c32_dote_2x32_e', family: 'compound', category: '32分音符彩蛋積木（3種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([0.5, 1/12, 1/12, 1/3], null, true)
-      },
-      {
-        id: 'c32_e_ddote_32', family: 'compound', category: '32分音符彩蛋積木（3種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([1/3, 7/12, 1/12], null, true)
-      },
-      {
-        id: 'c32_2e_s_2x32', family: 'compound', category: '32分音符彩蛋積木（3種）',
-        beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true,
-        notes: makeNotes([1/3, 1/3, 1/6, 1/12, 1/12], null, true)
-      }
+      { id: 'c_dotq', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([1]) },
+      { id: 'c_3e', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([1/3, 1/3, 1/3]) },
+      { id: 'c_q_e', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([2/3, 1/3]) },
+      { id: 'c_e_q', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([1/3, 2/3]) },
+      { id: 'c_dotqrest', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: true, notes: makeNotes([{ dur: 1, isRest: true }]) },
+      { id: 'c_dote_s_e', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8', notes: makeNotes([0.5, 1/6, 1/3]) },
+      { id: 'c_e_dote_s', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8', notes: makeNotes([1/3, 0.5, 1/6]) },
+      { id: 'c_e_s_dote', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_16_8', notes: makeNotes([1/3, 1/6, 0.5]) },
+      { id: 'c_2s_2e', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8', notes: makeNotes([1/6, 1/6, 1/3, 1/3]) },
+      { id: 'c_e_2s_e', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8', notes: makeNotes([1/3, 1/6, 1/6, 1/3]) },
+      { id: 'c_2e_2s', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'two16_two8', notes: makeNotes([1/3, 1/3, 1/6, 1/6]) },
+      { id: 'c_dote_3s_p1', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16', notes: makeNotes([0.5, 1/6, 1/6, 1/6]) },
+      { id: 'c_dote_3s_p2', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16', notes: makeNotes([1/6, 0.5, 1/6, 1/6]) },
+      { id: 'c_dote_3s_p3', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16', notes: makeNotes([1/6, 1/6, 0.5, 1/6]) },
+      { id: 'c_dote_3s_p4', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'dot8_three16', notes: makeNotes([1/6, 1/6, 1/6, 0.5]) },
+      { id: 'c_5n_p1', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes', notes: makeNotes([1/3, 1/6, 1/6, 1/6, 1/6]) },
+      { id: 'c_5n_p2', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes', notes: makeNotes([1/6, 1/3, 1/6, 1/6, 1/6]) },
+      { id: 'c_5n_p3', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes', notes: makeNotes([1/6, 1/6, 1/3, 1/6, 1/6]) },
+      { id: 'c_5n_p4', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes', notes: makeNotes([1/6, 1/6, 1/6, 1/3, 1/6]) },
+      { id: 'c_5n_p5', family: 'compound', category: '常規一大拍音型（20種）', beats: 1, tuplet: null, defaultOn: true, basic1Beat: false, colorGroup: 'five_notes', notes: makeNotes([1/6, 1/6, 1/6, 1/6, 1/3]) },
+      { id: 'c32_dote_2x32_e', family: 'compound', category: '32分音符彩蛋積木（3種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([0.5, 1/12, 1/12, 1/3], null, true) },
+      { id: 'c32_e_ddote_32', family: 'compound', category: '32分音符彩蛋積木（3種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([1/3, 7/12, 1/12], null, true) },
+      { id: 'c32_2e_s_2x32', family: 'compound', category: '32分音符彩蛋積木（3種）', beats: 1, tuplet: null, defaultOn: false, basic1Beat: false, isEgg: true, notes: makeNotes([1/3, 1/3, 1/6, 1/12, 1/12], null, true) }
     ];
 
     /* ==========================================================================
@@ -871,11 +588,11 @@
       activeMeterKey: '4/4',
       pendingMeterKey: '4/4',
       hasPendingChanges: false,
-      staffStyle: 'single',            // 'single' | 'five'
-      selectorTab: 'simple_quarter',   // 'simple_half' | 'simple_quarter' | 'compound'
-      tieMode: 'low',                  // 'none' | 'low' (1-2) | 'medium' (3-4)
-      eggMode: 'off',                  // 'off' | '0.25' | '0.55' | '1.0'
-      activeEggMode: 'off',            // synced for bottom palette & generation
+      staffStyle: 'single',
+      selectorTab: 'simple_quarter',
+      tieMode: 'low',
+      eggMode: 'off',
+      activeEggMode: 'off',
       playCount: 0,
       isSubmitted: false,
       enabledBlockIds: new Set(RHYTHM_BLOCKS.filter(b => b.defaultOn).map(b => b.id)),
@@ -898,7 +615,7 @@
     const dragState = {
       active: false,
       isDragging: false,
-      sourceType: null,      // 'palette' | 'placed'
+      sourceType: null,
       blockId: null,
       fromMeasureIdx: -1,
       fromBlockIdx: -1,
@@ -913,9 +630,9 @@
       isPlaying: false,
       playMode: 'exam_all',
       bpm: 72,
-      metronomeOn: false,    // Default OFF, zero count-in
+      metronomeOn: false,
       volRhythm: 0.9,
-      timbre: 'woodblock',   // 'woodblock' | 'piano' | 'snare'
+      timbre: 'woodblock',
       timerId: null,
       rafId: null,
       scheduleEvents: [],
@@ -925,8 +642,145 @@
     };
 
     /* ==========================================================================
-       3. NOTATION MATH & BEAT DURATION HELPERS
+       3. NOTATION MATH & BEAT DURATION HELPERS (EXACT POSITIONING + BLANK SLOTS)
        ========================================================================== */
+
+    function isBlankEntry(entry) {
+      return !entry || !!entry.isBlank;
+    }
+
+    function makeBlankEntry(beats) {
+      return {
+        isBlank: true,
+        beats: Math.max(0.5, Number(beats.toFixed(3))),
+        notes: []
+      };
+    }
+
+    function normalizeBlankSlotsInMeasure(measureIdx, measuresArr = state.measures) {
+      const meter = getActiveMeter();
+      const slotUnit = meter.slotUnit;
+      const blocks = measuresArr[measureIdx].blocks;
+
+      // Merge adjacent blank entries into a single blank entry
+      const merged = [];
+      blocks.forEach(b => {
+        if (!b || b.beats <= 0.001) return;
+        if (isBlankEntry(b)) {
+          const prev = merged[merged.length - 1];
+          if (prev && isBlankEntry(prev)) {
+            prev.beats = Number((prev.beats + b.beats).toFixed(3));
+          } else {
+            merged.push(makeBlankEntry(b.beats));
+          }
+        } else {
+          merged.push(b);
+        }
+      });
+
+      // Clamp total beats to meter.beats
+      let acc = 0;
+      const clamped = [];
+      for (const item of merged) {
+        if (acc >= meter.beats - 0.001) break;
+        if (acc + item.beats <= meter.beats + 0.001) {
+          clamped.push(item);
+          acc += item.beats;
+        } else if (isBlankEntry(item)) {
+          const rem = meter.beats - acc;
+          if (rem > 0.001) {
+            clamped.push(makeBlankEntry(rem));
+            acc = meter.beats;
+          }
+        }
+      }
+
+      // Snap blank lengths to slotUnit increments
+      clamped.forEach(item => {
+        if (isBlankEntry(item)) {
+          const snapped = Math.round(item.beats / slotUnit) * slotUnit;
+          if (snapped > 0.001) item.beats = Number(snapped.toFixed(3));
+        }
+      });
+
+      measuresArr[measureIdx].blocks = clamped;
+    }
+
+    // Checks whether [startBeat, startBeat + spanBeats] overlaps any ALREADY-PLACED sounding/rhythm block
+    // (ignoring an optional excluded block index when moving an existing block).
+    function canPlaceAtExactBeat(measureIdx, startBeat, spanBeats, excludeBlockIdx = -1, measuresArr = state.measures) {
+      const meter = getActiveMeter();
+      if (startBeat < -0.001 || startBeat + spanBeats > meter.beats + 0.001) {
+        return false;
+      }
+      const endBeat = startBeat + spanBeats;
+      let cursor = 0;
+
+      for (let i = 0; i < measuresArr[measureIdx].blocks.length; i++) {
+        const blk = measuresArr[measureIdx].blocks[i];
+        const bStart = cursor;
+        const bEnd = cursor + blk.beats;
+        cursor = bEnd;
+
+        if (i === excludeBlockIdx || isBlankEntry(blk)) continue;
+
+        const overlaps = (bEnd > startBeat + 0.001) && (bStart < endBeat - 0.001);
+        if (overlaps) return false;
+      }
+
+      return true;
+    }
+
+    // Places a block at the exact dragged beat offset without shifting other blocks,
+    // automatically filling any leading gap (e.g., beat 1-2 when dropping on beat 3) with a blank entry.
+    function placeBlockAtExactBeat(measureIdx, startBeat, newBlockObj, excludeBlockIdx = -1, measuresArr = state.measures) {
+      const meter = getActiveMeter();
+      const spanBeats = newBlockObj.beats;
+      const endBeat = startBeat + spanBeats;
+      if (!canPlaceAtExactBeat(measureIdx, startBeat, spanBeats, excludeBlockIdx, measuresArr)) {
+        return false;
+      }
+
+      // Collect all existing non-blank blocks with their exact startBeat
+      const fixedBlocks = [];
+      let cursor = 0;
+      measuresArr[measureIdx].blocks.forEach((blk, idx) => {
+        if (idx !== excludeBlockIdx && !isBlankEntry(blk)) {
+          fixedBlocks.push({
+            startBeat: cursor,
+            endBeat: cursor + blk.beats,
+            block: blk
+          });
+        }
+        cursor += blk.beats;
+      });
+
+      fixedBlocks.push({
+        startBeat,
+        endBeat,
+        block: newBlockObj
+      });
+
+      fixedBlocks.sort((a, b) => a.startBeat - b.startBeat);
+
+      // Rebuild measure timeline with exact blank gaps before/between/after placed blocks
+      const rebuilt = [];
+      let pos = 0;
+      fixedBlocks.forEach(item => {
+        if (item.startBeat > pos + 0.001) {
+          rebuilt.push(makeBlankEntry(item.startBeat - pos));
+        }
+        rebuilt.push(item.block);
+        pos = item.endBeat;
+      });
+      if (meter.beats > pos + 0.001) {
+        rebuilt.push(makeBlankEntry(meter.beats - pos));
+      }
+
+      measuresArr[measureIdx].blocks = rebuilt;
+      normalizeBlankSlotsInMeasure(measureIdx, measuresArr);
+      return true;
+    }
 
     function getActiveMeter() {
       return METERS[state.activeMeterKey];
@@ -976,8 +830,27 @@
       return { head: 'solid', stem: true, dots: 0, beams: 0 };
     }
 
-    function getMeasureUsedBeats(measureIdx, measuresArr = state.measures) {
-      return measuresArr[measureIdx].blocks.reduce((sum, blk) => sum + blk.beats, 0);
+    function getMeasureFilledBeats(measureIdx, measuresArr = state.measures) {
+      return measuresArr[measureIdx].blocks.reduce((sum, blk) => isBlankEntry(blk) ? sum : sum + blk.beats, 0);
+    }
+
+    // For quick-tap (non-drag click): finds the first available slot that fits `neededBeats`
+    function findAvailableBeatOffsetInMeasure(measureIdx, neededBeats, measuresArr = state.measures) {
+      const meter = getActiveMeter();
+      const blocks = measuresArr[measureIdx].blocks;
+      let cursor = 0;
+
+      for (const blk of blocks) {
+        if (isBlankEntry(blk) && blk.beats >= neededBeats - 0.001) {
+          return cursor;
+        }
+        cursor += blk.beats;
+      }
+
+      if (meter.beats - cursor >= neededBeats - 0.001) {
+        return cursor;
+      }
+      return -1;
     }
 
     function instantiateBlock(blockDef) {
@@ -986,6 +859,7 @@
         beats: blockDef.beats,
         tuplet: blockDef.tuplet,
         isEgg: !!blockDef.isEgg,
+        isBlank: false,
         notes: blockDef.notes.map(n => ({
           dur: n.dur,
           isRest: !!n.isRest,
@@ -998,13 +872,19 @@
 
     function cloneMeasure(m) {
       return {
-        blocks: m.blocks.map(b => ({
-          blockId: b.blockId,
-          beats: b.beats,
-          tuplet: b.tuplet,
-          isEgg: !!b.isEgg,
-          notes: b.notes.map(n => ({ ...n }))
-        }))
+        blocks: m.blocks.map(b => {
+          if (isBlankEntry(b)) {
+            return makeBlankEntry(b.beats);
+          }
+          return {
+            blockId: b.blockId,
+            beats: b.beats,
+            tuplet: b.tuplet,
+            isEgg: !!b.isEgg,
+            isBlank: false,
+            notes: b.notes.map(n => ({ ...n }))
+          };
+        })
       };
     }
 
@@ -1029,7 +909,7 @@
 
       const meter = getActiveMeter();
       const halfBeatMode = isHalfBeatMeter(meter);
-      const slotUnit = meter.slotUnit; // 0.5 for /2 meters, 1.0 for /4 and /8
+      const slotUnit = meter.slotUnit;
 
       const activePool = RHYTHM_BLOCKS.filter(b =>
         b.family === meter.family &&
@@ -1045,7 +925,6 @@
       );
       const pool = activePool.length > 0 ? activePool : fallbackPool;
 
-      // Easter egg pool (16th notes in /2 meters, 32nd notes in /4 & /8 meters)
       const eggPool = RHYTHM_BLOCKS.filter(b =>
         b.family === meter.family &&
         b.isEgg &&
@@ -1099,7 +978,6 @@
             candidates = fallbackPool.filter(b => b.beats <= remaining + 0.001);
           }
 
-          // Avoid putting a rest as the very first event of Measure 1 or final beat of Measure 4 for clean musical phrasing
           if ((mIdx === 0 && beatsFilled < 0.01) || (mIdx === 3 && remaining <= 1.01)) {
             const nonRestCandidates = candidates.filter(c => !c.notes.some(n => n.isRest));
             if (nonRestCandidates.length > 0) candidates = nonRestCandidates;
@@ -1121,18 +999,15 @@
         state.solutionMeasures[mIdx] = { blocks };
       }
 
-      // Apply exact tie count based on tieMode ('none': 0, 'low': 1-2, 'medium': 3-4)
       applySolutionTies(promptTags);
 
-      // Copy M0 and M1 into visible prompt measures; clear M2 and M3 for student dictation
       state.measures[0] = cloneMeasure(state.solutionMeasures[0]);
       state.measures[1] = cloneMeasure(state.solutionMeasures[1]);
 
-      // Hide cross-barline tie from M1 into M2 until student adds notes or submits
       const m1Blocks = state.measures[1].blocks;
-      if (m1Blocks.length > 0) {
-        const lastNote = m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1];
-        if (lastNote) lastNote.tieToNext = false;
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1])) {
+        const lastNotes = m1Blocks[m1Blocks.length - 1].notes;
+        if (lastNotes.length > 0) lastNotes[lastNotes.length - 1].tieToNext = false;
       }
 
       state.measures[2] = { blocks: [] };
@@ -1165,6 +1040,7 @@
       const flatNotes = [];
       for (let mIdx = 0; mIdx < 4; mIdx++) {
         state.solutionMeasures[mIdx].blocks.forEach((blk) => {
+          if (isBlankEntry(blk)) return;
           blk.notes.forEach((n, nIdx) => {
             flatNotes.push({
               mIdx,
@@ -1180,7 +1056,6 @@
         const curr = flatNotes[i];
         const next = flatNotes[i + 1];
         if (!curr.isLastInBlock) continue;
-        // Both notes must be sounding notes (never tie into or out of a rest)
         if (curr.note.isRest || next.note.isRest) continue;
         if (curr.note.isEgg || next.note.isEgg) continue;
         if (curr.note.dur < 0.124 || next.note.dur < 0.124) continue;
@@ -1209,21 +1084,23 @@
     }
 
     /* ==========================================================================
-       5. STUDENT DICTATION INPUT & DRAG-AND-DROP ENGINE (SUPPORTS 0.5-BEAT SLOTS)
+       5. STUDENT DICTATION INPUT, EXACT DROP TARGETING & ERASER REMOVAL
        ========================================================================== */
 
     function pushStudentHistory() {
       const m1Blocks = state.measures[1].blocks;
-      const m1LastTie = (m1Blocks.length > 0 && m1Blocks[m1Blocks.length - 1].notes.length > 0)
-        ? m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1].tieToNext
-        : false;
+      let m1LastTie = false;
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1])) {
+        const lastNotes = m1Blocks[m1Blocks.length - 1].notes;
+        if (lastNotes.length > 0) m1LastTie = lastNotes[lastNotes.length - 1].tieToNext;
+      }
 
       state.studentHistory.push({
         m1LastTie,
         m2: cloneMeasure(state.measures[2]),
         m3: cloneMeasure(state.measures[3])
       });
-      if (state.studentHistory.length > 40) state.studentHistory.shift();
+      if (state.studentHistory.length > 50) state.studentHistory.shift();
     }
 
     function insertBlockQuickTap(blockId) {
@@ -1236,21 +1113,24 @@
       const meter = getActiveMeter();
       if (blkDef.family !== meter.family) return;
 
-      const remM2 = meter.beats - getMeasureUsedBeats(2);
-      const remM3 = meter.beats - getMeasureUsedBeats(3);
+      const offsetM2 = findAvailableBeatOffsetInMeasure(2, blkDef.beats);
+      const offsetM3 = findAvailableBeatOffsetInMeasure(3, blkDef.beats);
 
       let targetMeasureIdx = -1;
-      if (remM2 >= blkDef.beats - 0.001) {
+      let targetBeat = 0;
+      if (offsetM2 >= 0) {
         targetMeasureIdx = 2;
-      } else if (remM2 < 0.001 && remM3 >= blkDef.beats - 0.001) {
+        targetBeat = offsetM2;
+      } else if (offsetM3 >= 0) {
         targetMeasureIdx = 3;
+        targetBeat = offsetM3;
       } else {
-        showToast(`⚠️ 剩餘拍數不足以放入此音型（需 ${blkDef.beats} 拍）`);
+        showToast(`⚠️ 可用空拍不足以放入此音型（需 ${blkDef.beats} 拍），可拖曳至指定空拍或按「×」清除`);
         return;
       }
 
       pushStudentHistory();
-      state.measures[targetMeasureIdx].blocks.push(instantiateBlock(blkDef));
+      placeBlockAtExactBeat(targetMeasureIdx, targetBeat, instantiateBlock(blkDef));
       sanitizeDanglingTies();
       renderAll();
 
@@ -1264,21 +1144,33 @@
 
     function removePlacedBlock(measureIdx, blockIdx) {
       if (state.isSubmitted || measureIdx < 2 || measureIdx > 3) return;
+      const targetBlk = state.measures[measureIdx].blocks[blockIdx];
+      if (!targetBlk || isBlankEntry(targetBlk)) return;
+
       stopPlayback();
       pushStudentHistory();
 
+      targetBlk.notes.forEach(n => { n.tieToNext = false; });
+
       if (blockIdx > 0) {
         const prevBlk = state.measures[measureIdx].blocks[blockIdx - 1];
-        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        if (!isBlankEntry(prevBlk) && prevBlk.notes.length > 0) {
+          prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        }
       } else if (measureIdx === 3 && state.measures[2].blocks.length > 0) {
         const prevBlk = state.measures[2].blocks[state.measures[2].blocks.length - 1];
-        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        if (!isBlankEntry(prevBlk) && prevBlk.notes.length > 0) {
+          prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        }
       } else if (measureIdx === 2 && state.measures[1].blocks.length > 0) {
         const prevBlk = state.measures[1].blocks[state.measures[1].blocks.length - 1];
-        prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        if (!isBlankEntry(prevBlk) && prevBlk.notes.length > 0) {
+          prevBlk.notes[prevBlk.notes.length - 1].tieToNext = false;
+        }
       }
 
-      state.measures[measureIdx].blocks.splice(blockIdx, 1);
+      state.measures[measureIdx].blocks[blockIdx] = makeBlankEntry(targetBlk.beats);
+      normalizeBlankSlotsInMeasure(measureIdx);
       sanitizeDanglingTies();
       renderAll();
     }
@@ -1288,8 +1180,9 @@
       stopPlayback();
       const prev = state.studentHistory.pop();
       const m1Blocks = state.measures[1].blocks;
-      if (m1Blocks.length > 0 && m1Blocks[m1Blocks.length - 1].notes.length > 0) {
-        m1Blocks[m1Blocks.length - 1].notes[m1Blocks[m1Blocks.length - 1].notes.length - 1].tieToNext = prev.m1LastTie;
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1])) {
+        const lastNotes = m1Blocks[m1Blocks.length - 1].notes;
+        if (lastNotes.length > 0) lastNotes[lastNotes.length - 1].tieToNext = prev.m1LastTie;
       }
       state.measures[2] = prev.m2;
       state.measures[3] = prev.m3;
@@ -1299,13 +1192,13 @@
 
     function clearStudentMeasures() {
       if (state.isSubmitted) return;
-      if (state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0) return;
+      if (getMeasureFilledBeats(2) < 0.01 && getMeasureFilledBeats(3) < 0.01) return;
       stopPlayback();
       pushStudentHistory();
       const m1Blocks = state.measures[1].blocks;
-      if (m1Blocks.length > 0) {
-        const lastBlk = m1Blocks[m1Blocks.length - 1];
-        if (lastBlk.notes.length > 0) lastBlk.notes[lastBlk.notes.length - 1].tieToNext = false;
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1])) {
+        const lastNotes = m1Blocks[m1Blocks.length - 1].notes;
+        if (lastNotes.length > 0) lastNotes[lastNotes.length - 1].tieToNext = false;
       }
       state.measures[2] = { blocks: [] };
       state.measures[3] = { blocks: [] };
@@ -1341,7 +1234,7 @@
       if (state.isSubmitted) return;
 
       const blk = state.measures[measureIdx].blocks[blockIdx];
-      if (!blk) return;
+      if (!blk || isBlankEntry(blk)) return;
 
       dragState.active = true;
       dragState.isDragging = false;
@@ -1387,6 +1280,7 @@
       ghost.classList.remove('hidden');
     }
 
+    // Computes exact drop beat from pointer X and highlights ONLY if that exact beat slot is free
     function evaluateDropHover(clientX, clientY) {
       clearDropSlotHighlights();
       dragState.hoverTarget = null;
@@ -1394,7 +1288,7 @@
       const blkDef = RHYTHM_BLOCKS.find(b => b.id === dragState.blockId);
       if (!blkDef) return;
       const meter = getActiveMeter();
-      const slotUnit = meter.slotUnit; // 0.5 for /2 meters, 1.0 for /4 and /8
+      const slotUnit = meter.slotUnit;
       const spanBeats = blkDef.beats;
 
       for (let mIdx = 2; mIdx <= 3; mIdx++) {
@@ -1402,66 +1296,52 @@
         if (!slotContainer) continue;
         const rect = slotContainer.getBoundingClientRect();
         if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
-          const dropZones = slotContainer.querySelectorAll('.beat-drop-zone');
-          let hoveredStartBeat = 0;
-          if (dropZones.length > 0) {
-            dropZones.forEach((dz) => {
-              const dzRect = dz.getBoundingClientRect();
-              if (clientX >= dzRect.left) {
-                hoveredStartBeat = parseFloat(dz.dataset.startBeat);
-              }
-            });
+          const svgEl = slotContainer.querySelector('svg');
+          const showTimeSig = (mIdx === 2);
+          const leftPad = showTimeSig ? 56 : 20;
+          const rightPad = 18;
+          const svgW = 460;
+
+          let exactBeat = 0;
+          if (svgEl) {
+            const svgRect = svgEl.getBoundingClientRect();
+            const scaleX = svgW / Math.max(1, svgRect.width);
+            const svgX = (clientX - svgRect.left) * scaleX;
+            const contentW = svgW - leftPad - rightPad;
+            const rawBeat = ((svgX - leftPad) / contentW) * meter.beats;
+            const clampedRaw = Math.max(0, Math.min(meter.beats - spanBeats, rawBeat));
+            exactBeat = Math.round(clampedRaw / slotUnit) * slotUnit;
           } else {
             const relX = Math.max(0, Math.min(0.999, (clientX - rect.left) / rect.width));
             const totalSlots = Math.round(meter.beats / slotUnit);
-            hoveredStartBeat = Math.floor(relX * totalSlots) * slotUnit;
+            exactBeat = Math.min(meter.beats - spanBeats, Math.floor(relX * totalSlots) * slotUnit);
           }
 
-          const existingBlocks = state.measures[mIdx].blocks.filter((_, idx) =>
-            !(dragState.sourceType === 'placed' && dragState.fromMeasureIdx === mIdx && idx === dragState.fromBlockIdx)
-          );
-          const usedBeats = existingBlocks.reduce((s, b) => s + b.beats, 0);
+          exactBeat = Math.max(0, Math.min(meter.beats - spanBeats, Number(exactBeat.toFixed(3))));
+          const exclIdx = (dragState.sourceType === 'placed' && dragState.fromMeasureIdx === mIdx)
+            ? dragState.fromBlockIdx
+            : -1;
 
-          if (usedBeats + spanBeats <= meter.beats + 0.001) {
-            let accBeat = 0;
-            let insertIdx = existingBlocks.length;
-            for (let i = 0; i < existingBlocks.length; i++) {
-              const midBeat = accBeat + existingBlocks[i].beats * 0.5;
-              if (hoveredStartBeat < midBeat - 0.001) {
-                insertIdx = i;
-                break;
-              }
-              accBeat += existingBlocks[i].beats;
-            }
-            const previewStartBeat = Math.min(meter.beats - spanBeats, accBeat);
-            highlightMeasureBeats(mIdx, previewStartBeat, spanBeats, 'insert');
+          const isFree = canPlaceAtExactBeat(mIdx, exactBeat, spanBeats, exclIdx);
+
+          if (isFree) {
+            highlightMeasureBeats(mIdx, exactBeat, spanBeats, 'place');
             dragState.hoverTarget = {
               measureIdx: mIdx,
-              mode: 'insert',
-              insertIdx,
-              valid: true
-            };
-            return;
-          }
-
-          if (hoveredStartBeat + spanBeats <= meter.beats + 0.001) {
-            highlightMeasureBeats(mIdx, hoveredStartBeat, spanBeats, 'replace');
-            dragState.hoverTarget = {
-              measureIdx: mIdx,
-              mode: 'replace',
-              startBeat: hoveredStartBeat,
+              startBeat: exactBeat,
               spanBeats,
               valid: true
             };
-            return;
+          } else {
+            highlightMeasureBeats(mIdx, exactBeat, spanBeats, 'invalid');
+            dragState.hoverTarget = {
+              measureIdx: mIdx,
+              startBeat: exactBeat,
+              spanBeats,
+              valid: false,
+              reason: 'occupied'
+            };
           }
-
-          highlightMeasureBeats(mIdx, hoveredStartBeat, Math.min(spanBeats, meter.beats - hoveredStartBeat), 'invalid');
-          dragState.hoverTarget = {
-            measureIdx: mIdx,
-            mode: 'invalid',
-            valid: false
-          };
           return;
         }
       }
@@ -1471,10 +1351,8 @@
       const container = document.getElementById(`measure-slot-${measureIdx}`);
       if (!container) return;
 
-      if (status === 'insert') {
+      if (status === 'place') {
         container.classList.add('border-emerald-500', 'bg-emerald-50/40');
-      } else if (status === 'replace') {
-        container.classList.add('border-amber-500', 'bg-amber-50/40');
       } else {
         container.classList.add('border-rose-500', 'bg-rose-50/40');
       }
@@ -1485,14 +1363,10 @@
         const zDur = parseFloat(z.dataset.durBeat);
         const overlaps = (zStart + zDur > startBeat + 0.001) && (zStart < startBeat + spanBeats - 0.001);
         if (overlaps) {
-          if (status === 'insert') {
+          if (status === 'place') {
             z.setAttribute('fill', '#10b981');
             z.setAttribute('fill-opacity', '0.28');
             z.setAttribute('stroke', '#059669');
-          } else if (status === 'replace') {
-            z.setAttribute('fill', '#f59e0b');
-            z.setAttribute('fill-opacity', '0.28');
-            z.setAttribute('stroke', '#d97706');
           } else {
             z.setAttribute('fill', '#f43f5e');
             z.setAttribute('fill-opacity', '0.28');
@@ -1524,6 +1398,8 @@
       const wasDragging = dragState.isDragging;
       const sourceType = dragState.sourceType;
       const blockId = dragState.blockId;
+      const fromMeasureIdx = dragState.fromMeasureIdx;
+      const fromBlockIdx = dragState.fromBlockIdx;
       const hoverTarget = dragState.hoverTarget;
 
       document.getElementById('drag-ghost').classList.add('hidden');
@@ -1541,7 +1417,11 @@
       if (!hoverTarget) return;
 
       if (!hoverTarget.valid) {
-        showToast('⚠️ 該位置剩餘拍數不足，請往前放置或選擇較短音型');
+        showToast(
+          hoverTarget.reason === 'occupied'
+            ? '⚠️ 該拍點已有其他積木，請放至空白拍點或先按「×」清除'
+            : '⚠️ 該位置超出小節範圍，請往前放置或選擇較短音型'
+        );
         return;
       }
 
@@ -1552,56 +1432,30 @@
       pushStudentHistory();
 
       let movedBlockObj = null;
+      let exclIdx = -1;
+
       if (sourceType === 'placed') {
-        movedBlockObj = state.measures[dragState.fromMeasureIdx].blocks.splice(dragState.fromBlockIdx, 1)[0];
-        movedBlockObj.notes.forEach(n => { n.tieToNext = false; });
+        const srcBlk = state.measures[fromMeasureIdx].blocks[fromBlockIdx];
+        if (!srcBlk || isBlankEntry(srcBlk)) return;
+        movedBlockObj = {
+          blockId: srcBlk.blockId,
+          beats: srcBlk.beats,
+          tuplet: srcBlk.tuplet,
+          isEgg: !!srcBlk.isEgg,
+          isBlank: false,
+          notes: srcBlk.notes.map(n => ({ ...n, tieToNext: false }))
+        };
+        if (fromMeasureIdx === hoverTarget.measureIdx) {
+          exclIdx = fromBlockIdx;
+        } else {
+          state.measures[fromMeasureIdx].blocks[fromBlockIdx] = makeBlankEntry(srcBlk.beats);
+          normalizeBlankSlotsInMeasure(fromMeasureIdx);
+        }
       } else {
         movedBlockObj = instantiateBlock(blkDef);
       }
 
-      const targetMeasure = state.measures[hoverTarget.measureIdx];
-
-      if (hoverTarget.mode === 'insert') {
-        targetMeasure.blocks.splice(hoverTarget.insertIdx, 0, movedBlockObj);
-      } else if (hoverTarget.mode === 'replace') {
-        const meter = getActiveMeter();
-        const newBlocks = [];
-        let cursorBeat = 0;
-        let inserted = false;
-
-        targetMeasure.blocks.forEach(b => {
-          const bStart = cursorBeat;
-          const bEnd = cursorBeat + b.beats;
-          const overlapStart = Math.max(bStart, hoverTarget.startBeat);
-          const overlapEnd = Math.min(bEnd, hoverTarget.startBeat + hoverTarget.spanBeats);
-
-          if (overlapEnd > overlapStart + 0.001) {
-            if (!inserted) {
-              newBlocks.push(movedBlockObj);
-              inserted = true;
-            }
-          } else {
-            if (!inserted && bStart >= hoverTarget.startBeat - 0.001) {
-              newBlocks.push(movedBlockObj);
-              inserted = true;
-            }
-            newBlocks.push(b);
-          }
-          cursorBeat += b.beats;
-        });
-
-        if (!inserted) newBlocks.push(movedBlockObj);
-
-        let total = 0;
-        targetMeasure.blocks = newBlocks.filter(b => {
-          if (total + b.beats <= meter.beats + 0.001) {
-            total += b.beats;
-            return true;
-          }
-          return false;
-        });
-      }
-
+      placeBlockAtExactBeat(hoverTarget.measureIdx, hoverTarget.startBeat, movedBlockObj, exclIdx);
       sanitizeDanglingTies();
       renderAll();
     }
@@ -1618,6 +1472,7 @@
       const list = [];
       for (let mIdx = 0; mIdx < 4; mIdx++) {
         measuresArr[mIdx].blocks.forEach((blk, bIdx) => {
+          if (isBlankEntry(blk)) return;
           blk.notes.forEach((n, nIdx) => {
             list.push({ mIdx, bIdx, nIdx, note: n });
           });
@@ -1640,12 +1495,13 @@
     function isNoteheadTieable(measureIdx, blockIdx, noteIdx, measuresArr = state.measures) {
       if (state.isSubmitted) return false;
       const mBlocks = measuresArr[measureIdx].blocks;
-      if (!mBlocks[blockIdx]) return false;
-      const targetNote = mBlocks[blockIdx].notes[noteIdx];
+      const blk = mBlocks[blockIdx];
+      if (!blk || isBlankEntry(blk)) return false;
+      const targetNote = blk.notes[noteIdx];
       if (!targetNote || targetNote.isRest) return false;
 
       const isLastBlockInMeasure = (blockIdx === mBlocks.length - 1);
-      const isLastNoteInBlock = (noteIdx === mBlocks[blockIdx].notes.length - 1);
+      const isLastNoteInBlock = (noteIdx === blk.notes.length - 1);
       const isLastNoteInMeasure = isLastBlockInMeasure && isLastNoteInBlock;
 
       if (measureIdx === 0) return false;
@@ -1683,7 +1539,7 @@
     function getStudentTieableEntries() {
       const entries = [];
       const m1Blocks = state.measures[1].blocks;
-      if (m1Blocks.length > 0 && state.measures[2].blocks.length > 0) {
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1]) && state.measures[2].blocks.length > 0) {
         const lastBlk = m1Blocks[m1Blocks.length - 1];
         const lastNote = lastBlk.notes[lastBlk.notes.length - 1];
         if (lastNote && !lastNote.isRest) {
@@ -1692,6 +1548,7 @@
       }
       for (let mIdx = 2; mIdx <= 3; mIdx++) {
         state.measures[mIdx].blocks.forEach(blk => {
+          if (isBlankEntry(blk)) return;
           blk.notes.forEach(n => {
             if (!n.isRest) entries.push({ note: n });
           });
@@ -1701,16 +1558,15 @@
     }
 
     /* ==========================================================================
-       7. SOUNDING-DURATION EQUIVALENCE GRADING ENGINE ("送出並公布答案")
+       7. SOUNDING-DURATION EQUIVALENCE GRADING ENGINE (ALLOWS BLANKS)
        ========================================================================== */
 
     function extractSoundingAndRestEvents(measuresArr) {
       const meter = getActiveMeter();
       const rawEvents = [];
 
-      // Track M1's final note solely for cross-barline ties into M2 beat 0
       const m1Blocks = measuresArr[1].blocks;
-      if (m1Blocks.length > 0) {
+      if (m1Blocks.length > 0 && !isBlankEntry(m1Blocks[m1Blocks.length - 1])) {
         const lastBlk = m1Blocks[m1Blocks.length - 1];
         const lastNote = lastBlk.notes[lastBlk.notes.length - 1];
         rawEvents.push({
@@ -1725,23 +1581,27 @@
 
       let beatCursor = 0;
       for (let mIdx = 2; mIdx <= 3; mIdx++) {
+        let localBeat = 0;
         measuresArr[mIdx].blocks.forEach((blk, bIdx) => {
+          if (isBlankEntry(blk)) {
+            localBeat += blk.beats;
+            return;
+          }
           blk.notes.forEach((n, nIdx) => {
             rawEvents.push({
               isM1Tail: false,
-              beatPos: beatCursor,
+              beatPos: beatCursor + localBeat,
               dur: n.dur,
               isRest: !!n.isRest,
               tieToNext: !n.isRest && !!n.tieToNext,
               domId: `note-m${mIdx}-b${bIdx}-n${nIdx}`
             });
-            beatCursor += n.dur;
+            localBeat += n.dur;
           });
         });
         beatCursor = (mIdx - 1) * meter.beats;
       }
 
-      // Merge tied sounding notes into true [onsetBeat, totalSoundingDur] intervals
       const soundingIntervals = [];
       const restEvents = [];
       let i = 0;
@@ -1787,12 +1647,10 @@
       stopPlayback();
 
       const meter = getActiveMeter();
-      const usedM2 = getMeasureUsedBeats(2);
-      const usedM3 = getMeasureUsedBeats(3);
-      if (usedM2 < 0.01 && usedM3 < 0.01) {
-        showToast('⚠️ 請先在第 3–4 小節填入積木後再送出答案');
-        return;
-      }
+      const usedM2 = getMeasureFilledBeats(2);
+      const usedM3 = getMeasureFilledBeats(3);
+      const totalFilled = usedM2 + usedM3;
+      const totalTarget = meter.beats * 2;
 
       const solData = extractSoundingAndRestEvents(state.solutionMeasures);
       const stuData = extractSoundingAndRestEvents(state.measures);
@@ -1802,14 +1660,12 @@
       let matchedSoundingCount = 0;
       let equivalentTieHits = 0;
 
-      // Default all student notes/rests to wrong unless matched
       stuData.rawEvents.forEach(ev => {
         if (ev.domId) {
           marks[ev.domId] = { status: 'wrong', equivHit: false };
         }
       });
 
-      // Match sounding intervals [onsetBeat, soundingDur]
       const matchedSolIndices = new Set();
       stuData.soundingIntervals.forEach(stuEv => {
         const solIdx = solData.soundingIntervals.findIndex((solEv, idx) =>
@@ -1831,7 +1687,6 @@
         }
       });
 
-      // Evaluate student rests: a rest is correct if no solution sounding event overlaps its silent window
       let matchedRestCount = 0;
       stuData.restEvents.forEach(stuRest => {
         const rStart = stuRest.onsetBeat + eps;
@@ -1848,15 +1703,14 @@
       });
 
       const totalSolItems = Math.max(solData.soundingIntervals.length + solData.restEvents.length, 1);
-      const totalStuItems = Math.max(stuData.soundingIntervals.length + stuData.restEvents.length, 1);
-      const denom = Math.max(totalSolItems, totalStuItems);
-      const rawPct = Math.round(((matchedSoundingCount + matchedRestCount) / denom) * 100);
+      const rawPct = totalFilled < 0.01
+        ? 0
+        : Math.round(((matchedSoundingCount + matchedRestCount) / totalSolItems) * 100);
       const finalScore = Math.max(0, Math.min(100, rawPct));
 
       state.gradeMarks = marks;
       state.isSubmitted = true;
 
-      // Render Score Banner
       const banner = document.getElementById('grading-score-banner');
       const isCompleteBars = Math.abs(usedM2 - meter.beats) < 0.01 && Math.abs(usedM3 - meter.beats) < 0.01;
       const isPerfect = finalScore === 100 && isCompleteBars;
@@ -1872,8 +1726,9 @@
         ? `<span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">✨ 含 ${equivalentTieHits} 處連結線等效時值命中</span>`
         : '';
 
-      const incompleteBadgeHtml = !isCompleteBars
-        ? `<span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">⚠️ 小節拍數未填滿</span>`
+      const fmt = (v) => Number.isInteger(v) ? v : v.toFixed(1);
+      const blankInfoHtml = !isCompleteBars
+        ? `<span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">⬜ 已填 ${fmt(totalFilled)} / ${totalTarget} 拍（留白拍點已略過硬湊）</span>`
         : '';
 
       banner.innerHTML = `
@@ -1887,18 +1742,18 @@
                 ${isPerfect ? '🎉 完全正確！實質發聲時值與解答完全一致' : (isGood ? '👏 表現不錯！請對照下方標準解答檢視細節' : '📝 已完成批改，請對照下方標準解答並重新試聽')}
               </span>
               ${equivBadgeHtml}
-              ${incompleteBadgeHtml}
+              ${blankInfoHtml}
             </div>
             <p class="text-xs font-semibold opacity-85">
-              實質發聲時值命中：<strong>${matchedSoundingCount} / ${solData.soundingIntervals.length}</strong> 組（以連結線組合出的音型若實質時值等同解答，均判定為 ✓ 正確）
+              實質發聲時值命中：<strong>${matchedSoundingCount} / ${solData.soundingIntervals.length}</strong> 組（聽不出來的拍點可留白，送出後直接對照標準解答）
             </p>
           </div>
         </div>
       `;
 
-      // Reveal Official Answer Section
       const solM1Blocks = state.solutionMeasures[1].blocks;
       const hasCrossM2ToM3 = solM1Blocks.length > 0 &&
+        !isBlankEntry(solM1Blocks[solM1Blocks.length - 1]) &&
         !solM1Blocks[solM1Blocks.length - 1].notes[solM1Blocks[solM1Blocks.length - 1].notes.length - 1].isRest &&
         solM1Blocks[solM1Blocks.length - 1].notes[solM1Blocks[solM1Blocks.length - 1].notes.length - 1].tieToNext;
 
@@ -1915,7 +1770,7 @@
     }
 
     /* ==========================================================================
-       8. PRECISION SVG SCORE & MINI PALETTE ENGRAVING (NOTES + RESTS + HALF-BEATS)
+       8. PRECISION SVG SCORE & MINI PALETTE ENGRAVING
        ========================================================================== */
 
     function renderRestSymbolSVG(head, dots, x, staffY, color = '#0f172a', scale = 1.0) {
@@ -1927,7 +1782,6 @@
       } else if (head === 'quarter') {
         out += `<path d="M -2.5 -13 L 3.5 -5.5 L -2.5 0.5 L 3.5 7.5 C 0 6.5 -3.5 9.5 -1 13.5 C -4.5 11.5 -5 6.5 -1 5 L -4.5 0.5 L 1.2 -5.5 L -3.5 -11.5 Z" fill="${color}" />`;
       } else {
-        // Eighth / 16th rest
         out += `<circle cx="-2.8" cy="-5.5" r="2.2" fill="${color}" />`;
         out += `<path d="M -2.5 -5.2 Q 1.5 -3.5 4.2 -7.5 L -1.2 10.5" fill="none" stroke="${color}" stroke-width="1.9" stroke-linecap="round" />`;
         if (head === 'solid_2') {
@@ -1966,7 +1820,6 @@
         const beatW = contentWidth / meter.beats;
 
         if (halfBeatMode) {
-          // /2 meters: Every pair of half-beats enclosed inside ONE outer dashed frame, with two tinted inner slots separated by a central gap
           for (let b = 0; b < meter.beats; b++) {
             const bx = leftPad + b * beatW;
             const outerX = bx + 2;
@@ -1975,21 +1828,17 @@
             const centerGap = 6;
             const halfW = (outerW - innerPad * 2 - centerGap) / 2;
 
-            // Outer dashed group frame for 1 full beat (2 half-beats)
             svg += `<rect x="${outerX}" y="22" width="${outerW}" height="112" rx="10" fill="none" stroke="#94a3b8" stroke-width="1.35" stroke-dasharray="4 3" />`;
 
-            // Left half-beat slot (soft emerald)
             const h1X = outerX + innerPad;
             svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b}" data-dur-beat="0.5" data-default-fill="#10b981" data-default-opacity="0.08" data-default-stroke="#6ee7b7" x="${h1X}" y="26" width="${halfW}" height="104" rx="6" fill="#10b981" fill-opacity="0.08" stroke="#6ee7b7" stroke-width="1" />`;
 
-            // Right half-beat slot (soft sky blue)
             const h2X = h1X + halfW + centerGap;
             svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b + 0.5}" data-dur-beat="0.5" data-default-fill="#0ea5e9" data-default-opacity="0.08" data-default-stroke="#7dd3fc" x="${h2X}" y="26" width="${halfW}" height="104" rx="6" fill="#0ea5e9" fill-opacity="0.08" stroke="#7dd3fc" stroke-width="1" />`;
 
             svg += `<text x="${bx + beatW / 2}" y="147" font-size="10" font-weight="700" text-anchor="middle" fill="#64748b">第${b + 1}拍（半+半）</text>`;
           }
         } else {
-          // Standard 1-beat drop zones for /4 and /8 meters
           for (let b = 0; b < meter.beats; b++) {
             const bx = leftPad + b * beatW;
             svg += `<rect class="beat-drop-zone" data-measure="${measureIdx}" data-start-beat="${b}" data-dur-beat="1" data-default-fill="#10b981" data-default-opacity="0.04" data-default-stroke="#a7f3d0" x="${bx + 2}" y="24" width="${beatW - 4}" height="108" rx="8" fill="#10b981" fill-opacity="0.04" stroke="#a7f3d0" stroke-width="1.2" stroke-dasharray="4 3" />`;
@@ -2039,7 +1888,15 @@
         const blkStartX = leftPad + (beatCursor / meter.beats) * contentWidth;
         const blkWidth = (blk.beats / meter.beats) * contentWidth;
 
-        // Drag Handle & Delete Pill for Student Measures 3 & 4 (Before Submission)
+        if (isBlankEntry(blk)) {
+          if (!isSolutionView && measureIdx >= 2 && !state.isSubmitted) {
+            const label = Number.isInteger(blk.beats) ? `${blk.beats}拍留白` : `${blk.beats.toFixed(1)}拍留白`;
+            svg += `<text x="${blkStartX + blkWidth / 2}" y="${staffCenterY + 35}" font-size="9.5" font-weight="700" text-anchor="middle" fill="#94a3b8">${label}</text>`;
+          }
+          beatCursor += blk.beats;
+          return;
+        }
+
         if (!isSolutionView && measureIdx >= 2 && !state.isSubmitted) {
           const pillW = Math.max(32, blkWidth - 6);
           const pillX = blkStartX + 3;
@@ -2047,7 +1904,7 @@
             <g class="cursor-grab" onpointerdown="beginPlacedPointerDown(event, ${measureIdx}, ${bIdx})">
               <rect x="${pillX}" y="25" width="${pillW}" height="17" rx="5" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1" />
               <text x="${pillX + 6}" y="36.5" font-size="9.5" font-weight="800" fill="#047857">⠿ ${blk.beats}拍</text>
-              <g class="delete-placed-btn cursor-pointer" onclick="event.stopPropagation(); removePlacedBlock(${measureIdx}, ${bIdx})">
+              <g class="delete-placed-btn cursor-pointer" title="橡皮擦清除（不影響其他拍點）" onclick="event.stopPropagation(); removePlacedBlock(${measureIdx}, ${bIdx})">
                 <circle cx="${pillX + pillW - 8}" cy="33.5" r="6" fill="#ffe4e6" />
                 <text x="${pillX + pillW - 8}" y="36.8" font-size="9.5" font-weight="900" text-anchor="middle" fill="#be123c">×</text>
               </g>
@@ -2141,8 +1998,8 @@
       svg += renderMeasureTies(measureIdx, noteCoords, leftPad, W - rightPad, staffCenterY, measuresArr);
 
       // 9. Empty Placeholder Guide
-      if (!isSolutionView && measureIdx >= 2 && measure.blocks.length === 0 && !state.isSubmitted) {
-        svg += `<text x="${leftPad + contentWidth / 2}" y="${staffCenterY + 35}" font-size="11.5" font-weight="700" text-anchor="middle" fill="#64748b">拖曳或點擊下方積木填入</text>`;
+      if (!isSolutionView && measureIdx >= 2 && getMeasureFilledBeats(measureIdx, measuresArr) < 0.01 && !state.isSubmitted) {
+        svg += `<text x="${leftPad + contentWidth / 2}" y="${staffCenterY + 35}" font-size="11" font-weight="700" text-anchor="middle" fill="#64748b">拖曳至指定拍點或點擊下方積木填入（可留白直接送出）</text>`;
       }
 
       // 10. Real-Time Playback Cursor
@@ -2228,7 +2085,7 @@
 
       if (measureIdx > 0 && noteCoords.length > 0 && !noteCoords[0].isRest) {
         const prevBlocks = measuresArr[measureIdx - 1].blocks;
-        if (prevBlocks.length > 0) {
+        if (prevBlocks.length > 0 && !isBlankEntry(prevBlocks[prevBlocks.length - 1])) {
           const prevLastBlk = prevBlocks[prevBlocks.length - 1];
           const prevLastNote = prevLastBlk.notes[prevLastBlk.notes.length - 1];
           if (prevLastNote && !prevLastNote.isRest && prevLastNote.tieToNext) {
@@ -2253,7 +2110,7 @@
           out += `<path d="M ${x1} ${tieY} Q ${(x1 + x2) / 2} ${tieY + sag} ${x2} ${tieY}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
         } else if (measureIdx < 3) {
           const nextMeasureBlocks = measuresArr[measureIdx + 1].blocks;
-          if (nextMeasureBlocks.length > 0 && !nextMeasureBlocks[0].notes[0].isRest) {
+          if (nextMeasureBlocks.length > 0 && !isBlankEntry(nextMeasureBlocks[0]) && !nextMeasureBlocks[0].notes[0].isRest) {
             const x1 = nc.x + 2;
             const x2 = rightBoundX + 10;
             out += `<path d="M ${x1} ${tieY} Q ${(x1 + x2) / 2} ${tieY + 11} ${x2} ${tieY}" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" />`;
@@ -2377,66 +2234,36 @@
        ========================================================================== */
 
     function getBlockColorTheme(blk) {
-      // Compound groups
       if (blk.colorGroup === 'dot8_16_8') {
-        return {
-          selector: 'bg-teal-50 border-teal-200',
-          palette: 'bg-teal-50 border-teal-200 hover:border-teal-500'
-        };
+        return { selector: 'bg-teal-50 border-teal-200', palette: 'bg-teal-50 border-teal-200 hover:border-teal-500' };
       }
       if (blk.colorGroup === 'two16_two8') {
-        return {
-          selector: 'bg-purple-50 border-purple-200',
-          palette: 'bg-purple-50 border-purple-200 hover:border-purple-500'
-        };
+        return { selector: 'bg-purple-50 border-purple-200', palette: 'bg-purple-50 border-purple-200 hover:border-purple-500' };
       }
       if (blk.colorGroup === 'dot8_three16') {
-        return {
-          selector: 'bg-rose-50 border-rose-200',
-          palette: 'bg-rose-50 border-rose-200 hover:border-rose-500'
-        };
+        return { selector: 'bg-rose-50 border-rose-200', palette: 'bg-rose-50 border-rose-200 hover:border-rose-500' };
       }
       if (blk.colorGroup === 'five_notes') {
-        return {
-          selector: 'bg-indigo-50 border-indigo-200',
-          palette: 'bg-indigo-50 border-indigo-200 hover:border-indigo-500'
-        };
+        return { selector: 'bg-indigo-50 border-indigo-200', palette: 'bg-indigo-50 border-indigo-200 hover:border-indigo-500' };
       }
-
-      // Half-beat (0.5拍) in /2 meters -> super-light green (#ecfdf3)
       if (Math.abs(blk.beats - 0.5) < 0.01) {
-        return {
-          selector: 'bg-[#ecfdf3] border-emerald-200',
-          palette: 'bg-[#ecfdf3] border-emerald-200 hover:border-emerald-500'
-        };
+        return { selector: 'bg-[#ecfdf3] border-emerald-200', palette: 'bg-[#ecfdf3] border-emerald-200 hover:border-emerald-500' };
       }
-
-      // 2-beat blocks -> soft blue
       if (blk.beats >= 2) {
-        return {
-          selector: 'bg-sky-50 border-sky-200',
-          palette: 'bg-sky-50 border-sky-200 hover:border-sky-500'
-        };
+        return { selector: 'bg-sky-50 border-sky-200', palette: 'bg-sky-50 border-sky-200 hover:border-sky-500' };
       }
-
-      // Standard 1-beat blocks -> clean white
-      return {
-        selector: 'bg-white border-slate-200',
-        palette: 'bg-white border-slate-200 hover:border-emerald-500'
-      };
+      return { selector: 'bg-white border-slate-200', palette: 'bg-white border-slate-200 hover:border-emerald-500' };
     }
 
     function renderAll() {
       const meter = getActiveMeter();
 
-      // 1. Render 4 SVG Measures
       for (let m = 0; m < 4; m++) {
         document.getElementById(`measure-slot-${m}`).innerHTML = renderMeasureSVG(m, state.measures, false);
       }
 
-      // 2. Update Progress & Buttons
-      const usedM2 = getMeasureUsedBeats(2);
-      const usedM3 = getMeasureUsedBeats(3);
+      const usedM2 = getMeasureFilledBeats(2);
+      const usedM3 = getMeasureFilledBeats(3);
       const totalUsed = usedM2 + usedM3;
       const totalTarget = meter.beats * 2;
       const remM2 = Math.max(0, meter.beats - usedM2);
@@ -2452,8 +2279,8 @@
 
       if (meterHint) {
         meterHint.textContent = isHalfBeatMeter(meter)
-          ? '二分1拍模式：以 0.5拍（半拍）為填入單位，每兩個半拍由同一虛線框包覆'
-          : '請聆聽全曲四小節，並聽寫填入第 3–4 小節';
+          ? '二分1拍模式：以 0.5拍為單位，可跳拍放入指定拍點，點擊 × 僅清除該拍點不前移，留白可送出批改'
+          : '請聆聽全曲四小節，可直接拖曳至指定拍點（前面拍數可留白），聽不出來的拍點也可留白直接送出';
       }
 
       if (state.isSubmitted) {
@@ -2464,17 +2291,17 @@
         if (undoBtn) undoBtn.disabled = true;
         if (clearBtn) clearBtn.disabled = true;
       } else {
-        if (zoneBadge) zoneBadge.textContent = '聽寫作答區 · 第 3–4 小節（拖曳或點擊下方積木填入）';
+        if (zoneBadge) zoneBadge.textContent = '聽寫作答區 · 第 3–4 小節（精準落點放入・點擊 × 僅清除該拍點不前移・留白可送出）';
         if (submitBtn) submitBtn.disabled = false;
         if (Math.abs(totalUsed - totalTarget) < 0.01) {
           progBadge.textContent = `✅ 已填滿兩小節（${totalTarget} / ${totalTarget} 拍）！可按「送出並公布答案」`;
           progBadge.className = 'text-xs font-extrabold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full';
         } else {
-          progBadge.textContent = `已填 ${fmt(totalUsed)} / ${totalTarget} 拍（第3小節剩 ${fmt(remM2)} 拍 · 第4小節剩 ${fmt(remM3)} 拍）`;
+          progBadge.textContent = `已填 ${fmt(totalUsed)} / ${totalTarget} 拍（第3小節剩 ${fmt(remM2)} 拍 · 第4小節剩 ${fmt(remM3)} 拍・可留白送出）`;
           progBadge.className = 'text-xs font-extrabold text-emerald-700';
         }
         if (undoBtn) undoBtn.disabled = state.studentHistory.length === 0;
-        if (clearBtn) clearBtn.disabled = (state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0);
+        if (clearBtn) clearBtn.disabled = totalUsed < 0.01;
       }
 
       renderStudentTieBar();
@@ -2534,7 +2361,6 @@
           ${isEggCatLocked ? `<span class="text-[11px] font-bold text-stone-500 bg-stone-100 border border-stone-200 px-2 py-0.5 rounded-md">🔒 需先開啟右上角「考題彩蛋：${eggLabelName}」方可勾選</span>` : ''}
         </div>`;
 
-        // 9-column grid layout, zero Chinese note descriptions inside cards
         html += `<div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-1.5">`;
 
         list.forEach(blk => {
@@ -2588,7 +2414,7 @@
         (!b.isEgg || includeEgg)
       );
 
-      subtitle.textContent = `僅顯示上方已勾選啟用之 ${state.activeMeterKey} 拍音型 · 拖曳至第 3–4 小節或點擊自動填入`;
+      subtitle.textContent = `僅顯示上方已勾選啟用之 ${state.activeMeterKey} 拍音型 · 拖曳至指定拍點或點擊自動填入`;
       countBadge.textContent = `可用積木：${availableBlocks.length} 個`;
 
       if (availableBlocks.length === 0) {
@@ -2600,7 +2426,6 @@
         return;
       }
 
-      // 9-column grid layout, zero Chinese note descriptions inside cards
       let html = '';
       availableBlocks.forEach(blk => {
         const theme = getBlockColorTheme(blk);
@@ -2745,7 +2570,6 @@
     function bulkSetBlocks(mode) {
       const blocksInTab = RHYTHM_BLOCKS.filter(b => b.family === state.selectorTab);
       blocksInTab.forEach(b => {
-        // Locked Easter egg blocks are skipped when eggMode === 'off'
         if (b.isEgg && state.eggMode === 'off') {
           state.enabledBlockIds.delete(b.id);
           return;
@@ -2792,7 +2616,6 @@
         ? 'text-[10.5px] font-extrabold px-1.5 py-0.5 rounded bg-stone-200 text-slate-600'
         : 'text-[10.5px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500 text-white';
 
-      // When off -> lock & uncheck all Easter egg blocks; when enabled -> unlock & check them
       RHYTHM_BLOCKS.forEach(b => {
         if (b.isEgg) {
           if (val === 'off') state.enabledBlockIds.delete(b.id);
@@ -2868,7 +2691,7 @@
     }
 
     /* ==========================================================================
-       11. WEB AUDIO API SCHEDULER (NO COUNT-IN, CRISP WOODBLOCK & STEADY PIANO)
+       11. WEB AUDIO API SCHEDULER
        ========================================================================== */
 
     function createNoiseBuffer(ctx) {
@@ -2918,6 +2741,10 @@
 
         let localBeat = 0;
         sourceMeasures[mIdx].blocks.forEach((blk, bIdx) => {
+          if (isBlankEntry(blk)) {
+            localBeat += blk.beats;
+            return;
+          }
           blk.notes.forEach((n, nIdx) => {
             rawNotes.push({
               beatTime: mStartBeat + localBeat,
@@ -2976,8 +2803,8 @@
 
     function startPlayback(mode) {
       if ((mode === 'student_only' || mode === 'student_all') &&
-          state.measures[2].blocks.length === 0 && state.measures[3].blocks.length === 0) {
-        showToast('⚠️ 第 3–4 小節目前為空，請先填入積木再試聽');
+          getMeasureFilledBeats(2) < 0.01 && getMeasureFilledBeats(3) < 0.01) {
+        showToast('⚠️ 第 3–4 小節目前沒有填入音符，可先填入積木再試聽');
         return;
       }
 
@@ -2993,7 +2820,6 @@
       audioState.totalBeats = timeline.totalBeats;
       audioState.nextEventIdx = 0;
       audioState.isPlaying = true;
-      // Start immediately on Bar 1 Beat 1 (zero count-in)
       audioState.startTime = audioState.ctx.currentTime + 0.04;
 
       document.getElementById('btn-stop').disabled = false;
@@ -3072,7 +2898,6 @@
       if (vol <= 0.001) return;
 
       if (timbre === 'woodblock') {
-        // Crisp hollow knock (820Hz + 1235Hz sine/triangle oscillators with rapid exponential decay)
         const osc1 = ctx.createOscillator();
         const osc2 = ctx.createOscillator();
         const bandpass = ctx.createBiquadFilter();
@@ -3105,8 +2930,7 @@
         osc2.stop(time + 0.064);
 
       } else if (timbre === 'piano') {
-        // Steady string vibration at E4 (329.63Hz) with warm overtones and clean damper release
-        const fundamental = 329.63; // E4
+        const fundamental = 329.63;
         const holdEnd = time + Math.max(durationSec * 0.92, 0.08);
         const releaseEnd = holdEnd + 0.065;
 
@@ -3138,7 +2962,6 @@
         });
 
       } else if (timbre === 'snare') {
-        // Crisp Snare Drum
         const noise = ctx.createBufferSource();
         noise.buffer = noiseBuffer;
 
@@ -3199,7 +3022,6 @@
           const contentW = 460 - leftPad - 18;
           const x = leftPad + (beatInMeasure / meter.beats) * contentW;
 
-          // When playing exam_all or exam_34 before submission, keep cursor on Bars 1-2 only (don't spoil empty Bars 3-4 position visually)
           const isExamMode = (audioState.playMode === 'exam_all' || audioState.playMode === 'exam_34');
           if (!isExamMode || activeMeasure < 2 || state.isSubmitted) {
             if (isExamMode && state.isSubmitted && activeMeasure >= 2) {
